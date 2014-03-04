@@ -22,6 +22,9 @@
 #include "symbol.h"
 
 static void showSymbolInfo(Symbol *symbol);
+static Symbol *CopySymbolData(Symbol *);
+static void MarkDynSymbol(Symbol *, Symbol *);
+
 Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
 {
     Symbol *cur_symbol, *last_symbol, *first_symbol;
@@ -70,6 +73,7 @@ Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
             
             cur_symbol->sym_sd_type = SYM_LOCAL;
             cur_symbol->sym_version = 0;
+            cur_symbol->sym_version_name = NULL;
         }
         
         if (elf_file->elf_file_type == BINARY_SHARED_TYPE) {
@@ -85,10 +89,10 @@ Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
             cur_symbol->sym_version = GetVersionNumber(gnu_version, i);
             UINT8 *version_name;
             version_name = GetVersionName(vd_list, cur_symbol->sym_version);
-            if (version_name == NULL)
-                continue;
-            cur_symbol->sym_version_name = (UINT8 *)malloc(strlen(version_name) + 1);
-            strcpy(cur_symbol->sym_version_name, version_name);
+            if (version_name) {
+                cur_symbol->sym_version_name = (UINT8 *)malloc(strlen(version_name) + 1);
+                strcpy(cur_symbol->sym_version_name, version_name);
+            }
         }
 
         if (first_symbol == NULL) {
@@ -99,6 +103,8 @@ Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
             InsertSymbolAfterSymbol(cur_symbol, last_symbol);
             last_symbol = cur_symbol;
         }
+        
+        /*printf("%d %s\n", i, cur_symbol->sym_name);*/
     }
     
     if (vd_list != NULL)
@@ -118,6 +124,113 @@ void InsertSymbolAfterSymbol(Symbol *new_symbol, Symbol *symbol)
         new_symbol->sym_next->sym_prev = new_symbol;
 }
 
+// sym_target: symbols in object file
+// sym_source: symbols in .so file
+Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
+{
+    Symbol *cur_symbol, *last_symbol, *first_symbol;
+    cur_symbol = last_symbol = first_symbol = NULL;
+    
+    MarkDynSymbol(sym_target, sym_source);
+    
+    while (sym_target) {
+    /*printf("test\n");*/
+        if (sym_target->sym_sd_type == SYM_LOCAL) {
+            sym_target = sym_target->sym_next;
+            continue;
+        }
+        
+        cur_symbol = CopySymbolData(sym_target);
+        
+        if (first_symbol == NULL) {
+            first_symbol = cur_symbol;
+            last_symbol = cur_symbol;
+        }
+        else {
+            InsertSymbolAfterSymbol(cur_symbol, last_symbol);
+            last_symbol = cur_symbol;
+        }
+        sym_target = sym_target->sym_next;
+    }
+    
+    showSymbolInfo(first_symbol);
+    return first_symbol;
+}
+
+static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
+{
+    Symbol *cur_target, *cur_source, *first_target;
+    first_target = cur_target = sym_target;
+    cur_source = sym_source;
+    /*Symbol *cur_symbol, *last_symbol, *first_symbol;*/
+    /*cur_symbol = last_symbol = first_symbol = NULL;*/
+    
+    while (cur_source != NULL) {
+        while (cur_target != NULL) {
+            if (!strcmp(cur_source->sym_name, cur_target->sym_name) && (cur_target->sym_sd_type == SYM_LOCAL)) {
+                
+                if ((cur_source->sym_content->st_info & 0xf) == STT_FUNC) {
+                    cur_target->sym_sd_type = SYM_PLT;
+                    cur_target->sym_content->st_info = cur_target->sym_content->st_info & 0xfffffff0 + STT_FUNC;
+                    cur_target->sym_version = cur_source->sym_version;
+                    cur_target->sym_version_name = (UINT8 *)malloc(strlen(cur_source->sym_version_name) + 1);
+                    strcpy(cur_target->sym_version_name, cur_source->sym_version_name);
+                }
+                else {
+                    cur_target->sym_sd_type = SYM_GOT;
+                    cur_target->sym_version = cur_source->sym_version;
+                    // UNFIXED: Maybe a Bug here
+                    if (cur_target->sym_version != 0) {
+                        cur_target->sym_version_name = (UINT8 *)malloc(strlen(cur_source->sym_version_name) + 1);
+                        strcpy(cur_target->sym_version_name, cur_source->sym_version_name);
+                    }
+                }
+                
+                /*cur_symbol = CopySymbolData(cur_target);*/
+                
+                /*if (first_symbol == NULL) {*/
+                    /*first_symbol = cur_symbol;*/
+                    /*last_symbol = cur_symbol;*/
+                /*}*/
+                /*else {*/
+                    /*InsertSymbolAfterSymbol(cur_symbol, last_symbol);*/
+                    /*last_symbol = cur_symbol;*/
+                /*}*/
+                break;
+            }
+            cur_target = cur_target->sym_next;
+        }
+        cur_source = cur_source->sym_next;
+        cur_target = first_target;
+    }
+    
+    /*showSymbolInfo(first_target);*/
+    /*printf("test\n");*/
+    /*showSymbolInfo(first_symbol);*/
+    /*printf("test\n");*/
+}
+
+static Symbol *CopySymbolData(Symbol *sym)
+{
+    Symbol *symbol_shadow;
+    
+    symbol_shadow = (Symbol *)malloc(sizeof(Symbol));
+    symbol_shadow->sym_prev = symbol_shadow->sym_next = NULL;
+    symbol_shadow->sym_name = (UINT8 *)malloc(strlen(sym->sym_name) + 1);
+    strcpy(symbol_shadow->sym_name, sym->sym_name);
+    symbol_shadow->sym_content = (Elf32_Sym *)malloc(sizeof(Elf32_Sym));
+    memcpy(symbol_shadow->sym_content, sym->sym_content, sizeof(Elf32_Sym));
+    symbol_shadow->sym_sd_type = sym->sym_sd_type;
+    symbol_shadow->sym_version = sym->sym_version;
+    // UNFIXED: Maybe a Bug here
+    if (symbol_shadow->sym_version != 0) {
+        symbol_shadow->sym_version_name = (UINT8 *)malloc(strlen(sym->sym_version_name) + 1);
+        strcpy(symbol_shadow->sym_version_name, sym->sym_version_name);
+    }
+    
+    return symbol_shadow;
+}
+
 static void showSymbolInfo(Symbol *symbol)
 {
     Symbol *cur_symbol;
@@ -126,25 +239,26 @@ static void showSymbolInfo(Symbol *symbol)
     cur_symbol = symbol;
     int i = 0;
     while (cur_symbol != NULL) {
-        printf("%2d: ", i);
+        /*printf("%d ", i);*/
         /*printf("%8x: ", cur_symbol->sym_value);*/
         /*printf("%5d: ", cur_symbol->sym_size);*/
-        printf("%s ", cur_symbol->sym_name);
-        printf("%d ", cur_symbol->sym_version);
-        if (cur_symbol->sym_version_name == NULL)
-            continue;
-        printf("%s\n", cur_symbol->sym_version_name);
+        /*printf("%s ", cur_symbol->sym_name);*/
+        /*printf("%d\n", cur_symbol->sym_sd_type);*/
+        /*printf("%d ", cur_symbol->sym_version);*/
+        /*if (cur_symbol->sym_version_name == NULL)*/
+            /*continue;*/
+        /*printf("%s\n", cur_symbol->sym_version_name);*/
         /*printf("\n");*/
         /*printf("%d: ", cur_symbol->sym_binding);*/
         /*printf("%d  ", cur_symbol->sym_shndx);*/
-        /*if (cur_symbol->sym_sd_type == SYM_GOT) {*/
-            /*printf("%d GOT  %s", i, cur_symbol->sym_name);*/
-            /*printf("\n");*/
-        /*}*/
-        /*if (cur_symbol->sym_sd_type == SYM_PLT) {*/
-            /*printf("%d PLT %s", i, cur_symbol->sym_name);*/
-            /*printf("\n");*/
-        /*}*/
+        if (cur_symbol->sym_sd_type == SYM_GOT) {
+            printf("%d GOT  %s", i, cur_symbol->sym_name);
+            printf("\n");
+        }
+        if (cur_symbol->sym_sd_type == SYM_PLT) {
+            printf("%d PLT %s %d %s", i, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name);
+            printf("\n");
+        }
         
         cur_symbol = cur_symbol->sym_next;
         i++;

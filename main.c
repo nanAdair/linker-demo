@@ -51,8 +51,10 @@ int main(int argc, char *argv[])
     
     Symbol *sym_list, *so_sym_list;
     
-    /*sym_list = GetSymbols(obj_file, sec_list);*/
+    sym_list = GetSymbols(obj_file, sec_list);
     so_sym_list = GetSymbols(so_file, so_sec_list);
+    
+    MakeDynSymbol(sym_list, so_sym_list);
     
     /*showSection(sec_list);*/
 }

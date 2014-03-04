@@ -44,5 +44,6 @@ typedef struct Symbol {
 // function declaration
 Symbol *GetSymbols(Elf32_File *, Section *);
 void InsertSymbolAfterSymbol(Symbol *, Symbol *);
+Symbol *MakeDynSymbol(Symbol *, Symbol *);
 
 #endif
