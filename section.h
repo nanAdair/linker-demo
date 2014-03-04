@@ -63,4 +63,5 @@ typedef struct Section {
 // function declaration
 Section *GetSections(Elf32_File *);
 void InsertSectionAfterSection(Section *, Section *);
+Section *GetSectionByName(Section *, UINT8 *);
 #endif

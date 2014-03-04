@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  *
- *       Filename:  global.h
+ *       Filename:  utils.h
  *
- *    Description:  some global data
+ *    Description:  
  *
  *        Version:  1.0
- *        Created:  03/02/2014 10:18:55 AM
+ *        Created:  03/03/2014 10:32:06 AM
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -16,16 +16,20 @@
  * =====================================================================================
  */
 
-#ifndef GLOBAL_H
-#define GLOBAL_H
+#ifndef UTILS_H
+#define UTILS_H
 
-// include the includes
-
-#include "file.h"
-#include "convert.h"
 #include "type.h"
 #include "section.h"
-#include "version.h"
-#include "utils.h"
+
+typedef struct Dyn {
+    INT32 d_tag;
+    union {
+        UINT32 d_val;
+        UINT32 d_ptr;
+    } d_un;
+} Dyn;
+
+int GetDynDataByTag(Section *, int);
 
 #endif

@@ -19,6 +19,7 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
+#include "elf.h"
 #include "type.h"
 
 typedef enum {
@@ -31,13 +32,9 @@ typedef struct Symbol {
     struct Symbol *sym_prev;
     struct Symbol *sym_next;
     UINT8 *sym_name;
-    int sym_value;
-    int sym_size;
-    short sym_type;
-    short sym_binding;
-    short sym_shndx;
-    UINT8 *sym_data;
+    Elf32_Sym *sym_content;
     SYM_SD_TYPE sym_sd_type;
-    short sym_version;
+    UINT16 sym_version;
     UINT8 *sym_version_name;
 } Symbol;
+#endif

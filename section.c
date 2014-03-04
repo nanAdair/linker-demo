@@ -96,3 +96,19 @@ void InsertSectionAfterSection(Section *new_section, Section *section)
         new_section->sec_next->sec_prev = new_section;
     }
 }
+
+Section *GetSectionByName(Section *sec_list, UINT8 *sec_name)
+{
+    Section *cur_section;
+    cur_section = sec_list;
+    
+    while (cur_section) {
+        if (strcmp(cur_section->sec_name, sec_name) == 0)
+            return cur_section;
+
+        cur_section = cur_section->sec_next;
+    }
+    
+    printf("error the %s section doesn't exits\n", sec_name);
+    exit(EXIT_FAILURE);
+}

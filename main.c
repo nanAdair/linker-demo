@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <elf.h>
 
 #include "global.h"
 
@@ -44,8 +45,13 @@ int main(int argc, char *argv[])
     
     Section *sec_list;
     sec_list = GetSections(obj_file);
+
+    Section *so_sec_list;
+    so_sec_list = GetSections(so_file);
     
-    showSection(sec_list);
+    GetSymbolVersions(so_sec_list);
+    
+    /*showSection(sec_list);*/
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
