@@ -48,5 +48,8 @@ typedef struct Vd_Aux {
 // functions declaration
 Vd_item *GetSymbolVersions(Section *);
 Vd_item *FillVersionData(Section *, int, Section *);
-UINT8 *GetVersionName(Vd_Aux *, Section *);
+UINT8 *FillVersionName(Vd_Aux *, Section *);
+UINT8 GetVersionNumber(Section *, int);
+UINT8 *GetVersionName(Vd_item *, UINT8);
+void FreeVersionsData(Vd_item *);
 #endif

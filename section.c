@@ -59,19 +59,6 @@ Section *GetSections(Elf32_File *elf_file)
         cur_section->sec_name = (UINT8 *)malloc(name_length + 1);
         strcpy(cur_section->sec_name, section_strn_table + cur_section->sec_name_offset);
         
-        /*if (last_section == NULL) {*/
-            /*first_section = cur_section;*/
-            /*cur_section->sec_prev = NULL;*/
-            /*cur_section->sec_next = NULL;*/
-            /*last_section = cur_section;*/
-        /*}*/
-        /*else {*/
-            /*last_section->sec_next = cur_section;*/
-            /*cur_section->sec_prev = last_section;*/
-            /*cur_section->sec_next = NULL;*/
-            /*last_section = cur_section;*/
-        /*}*/
-        
         if (first_section == NULL) {
             first_section = cur_section;
             last_section = cur_section;

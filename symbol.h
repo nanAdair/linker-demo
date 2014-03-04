@@ -21,6 +21,9 @@
 
 #include "elf.h"
 #include "type.h"
+#include "file.h"
+#include "section.h"
+#include "version.h"
 
 typedef enum {
     SYM_LOCAL,
@@ -37,4 +40,9 @@ typedef struct Symbol {
     UINT16 sym_version;
     UINT8 *sym_version_name;
 } Symbol;
+
+// function declaration
+Symbol *GetSymbols(Elf32_File *, Section *);
+void InsertSymbolAfterSymbol(Symbol *, Symbol *);
+
 #endif

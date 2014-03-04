@@ -27,5 +27,6 @@
 #include "section.h"
 #include "version.h"
 #include "utils.h"
+#include "symbol.h"
 
 #endif

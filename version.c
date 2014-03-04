@@ -55,7 +55,7 @@ Vd_item *FillVersionData(Section *vd, int number, Section *dynstr)
             offset = 0;
         else 
             offset += last_item->vd_content->vd_offset_next;
-        cur_version = (Version_Def *)(vd->sec_data + offset);
+        memcpy(cur_version, vd->sec_data + offset, sizeof(Version_Def));
         
         cur_item->vd_content = cur_version;
         
@@ -64,7 +64,7 @@ Vd_item *FillVersionData(Section *vd, int number, Section *dynstr)
         Vd_Aux *cur_aux;
         cur_aux = (Vd_Aux *)(vd->sec_data + offset + offset_aux);
         
-        cur_item->vd_version_name = GetVersionName(cur_aux, dynstr);
+        cur_item->vd_version_name = FillVersionName(cur_aux, dynstr);
         
         if (first_item == NULL) {
             first_item = cur_item;
@@ -80,12 +80,12 @@ Vd_item *FillVersionData(Section *vd, int number, Section *dynstr)
         }
     }
     
-    showVersion(first_item);
+    /*showVersion(first_item);*/
     
     return first_item;
 }
 
-UINT8 *GetVersionName(Vd_Aux *verdaux, Section *dynstr)
+UINT8 *FillVersionName(Vd_Aux *verdaux, Section *dynstr)
 {
     UINT8 *str;
     int length;
@@ -96,17 +96,43 @@ UINT8 *GetVersionName(Vd_Aux *verdaux, Section *dynstr)
     return str;
 }
 
+UINT8 GetVersionNumber(Section *gnu_section, int offset)
+{
+    UINT16 number;
+    number = gnu_section->sec_data[gnu_section->sec_entsize * offset];
+    
+    return number;
+}
+
+UINT8 *GetVersionName(Vd_item *vd_list, UINT8 version_number)
+{
+    Vd_item *cur_item;
+    
+    cur_item = vd_list;
+    while (cur_item) {
+        if (cur_item->vd_content->vd_ndx == version_number)
+            return cur_item->vd_version_name;
+
+        cur_item = cur_item->vd_next;
+    }
+    
+    return NULL;
+}
+
 void FreeVersionsData(Vd_item *vd_list)
 {
     Vd_item *cur_item, *last_item;
     
+    cur_item = vd_list;
+    last_item = NULL;
     while (cur_item) {
+        
         free(cur_item->vd_content);
         free(cur_item->vd_version_name);
         if (last_item != NULL)
             free(last_item);
-        cur_item = cur_item->vd_next;
         last_item = cur_item;
+        cur_item = cur_item->vd_next;
     }
     
     free(last_item);

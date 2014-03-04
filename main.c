@@ -49,7 +49,10 @@ int main(int argc, char *argv[])
     Section *so_sec_list;
     so_sec_list = GetSections(so_file);
     
-    GetSymbolVersions(so_sec_list);
+    Symbol *sym_list, *so_sym_list;
+    
+    /*sym_list = GetSymbols(obj_file, sec_list);*/
+    so_sym_list = GetSymbols(so_file, so_sec_list);
     
     /*showSection(sec_list);*/
 }
