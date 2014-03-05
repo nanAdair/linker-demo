@@ -134,7 +134,6 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
     MarkDynSymbol(sym_target, sym_source);
     
     while (sym_target) {
-    /*printf("test\n");*/
         if (sym_target->sym_sd_type == SYM_LOCAL) {
             sym_target = sym_target->sym_next;
             continue;
@@ -157,6 +156,7 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
     return first_symbol;
 }
 
+// 动态符号有三种：GOT，PLT，导出符号
 static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
 {
     Symbol *cur_target, *cur_source, *first_target;
@@ -171,10 +171,16 @@ static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
                 
                 if ((cur_source->sym_content->st_info & 0xf) == STT_FUNC) {
                     cur_target->sym_sd_type = SYM_PLT;
-                    cur_target->sym_content->st_info = cur_target->sym_content->st_info & 0xfffffff0 + STT_FUNC;
+                    cur_target->sym_content->st_info = (cur_target->sym_content->st_info & 0xfffffff0) + STT_FUNC;
                     cur_target->sym_version = cur_source->sym_version;
                     cur_target->sym_version_name = (UINT8 *)malloc(strlen(cur_source->sym_version_name) + 1);
                     strcpy(cur_target->sym_version_name, cur_source->sym_version_name);
+                }
+                else if (cur_source->sym_content->st_shndx == SHN_UNDEF) {
+                    cur_target->sym_sd_type = SYM_OUT;
+                    if (cur_target->sym_content->st_shndx != SHN_UNDEF)
+                        cur_target->sym_version = 1;
+                    cur_target->sym_version_name = NULL;
                 }
                 else {
                     cur_target->sym_sd_type = SYM_GOT;
@@ -223,7 +229,7 @@ static Symbol *CopySymbolData(Symbol *sym)
     symbol_shadow->sym_sd_type = sym->sym_sd_type;
     symbol_shadow->sym_version = sym->sym_version;
     // UNFIXED: Maybe a Bug here
-    if (symbol_shadow->sym_version != 0) {
+    if (symbol_shadow->sym_version != 0 && symbol_shadow->sym_version != 1) {
         symbol_shadow->sym_version_name = (UINT8 *)malloc(strlen(sym->sym_version_name) + 1);
         strcpy(symbol_shadow->sym_version_name, sym->sym_version_name);
     }
@@ -252,11 +258,15 @@ static void showSymbolInfo(Symbol *symbol)
         /*printf("%d: ", cur_symbol->sym_binding);*/
         /*printf("%d  ", cur_symbol->sym_shndx);*/
         if (cur_symbol->sym_sd_type == SYM_GOT) {
-            printf("%d GOT  %s", i, cur_symbol->sym_name);
+            printf("%d GOT  %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version);
             printf("\n");
         }
         if (cur_symbol->sym_sd_type == SYM_PLT) {
-            printf("%d PLT %s %d %s", i, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name);
+            printf("%d PLT %s %d %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);
+            printf("\n");
+        }
+        if (cur_symbol->sym_sd_type == SYM_OUT) {
+            printf("%d OUT  %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version);
             printf("\n");
         }
         

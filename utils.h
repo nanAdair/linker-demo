@@ -30,6 +30,7 @@ typedef struct Dyn {
     } d_un;
 } Dyn;
 
-int GetDynDataByTag(Section *, int);
+struct Section;
+int GetDynDataByTag(struct Section *, int);
 
 #endif

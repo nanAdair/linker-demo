@@ -45,11 +45,12 @@ typedef struct Vd_Aux {
     UINT32 vda_next;
 } Vd_Aux;
 
+struct Section;
 // functions declaration
-Vd_item *GetSymbolVersions(Section *);
-Vd_item *FillVersionData(Section *, int, Section *);
-UINT8 *FillVersionName(Vd_Aux *, Section *);
-UINT8 GetVersionNumber(Section *, int);
+Vd_item *GetSymbolVersions(struct Section *);
+Vd_item *FillVersionData(struct Section *, int, struct Section *);
+UINT8 *FillVersionName(Vd_Aux *, struct Section *);
+UINT8 GetVersionNumber(struct Section *, int);
 UINT8 *GetVersionName(Vd_item *, UINT8);
 void FreeVersionsData(Vd_item *);
 #endif

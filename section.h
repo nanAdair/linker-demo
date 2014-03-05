@@ -20,6 +20,7 @@
 
 #include "type.h"
 #include "file.h"
+#include "symbol.h"
 
 #define MAGIC (-1)
 
@@ -61,10 +62,16 @@ typedef struct Section {
     UINT32 sec_file_offset; // 在文件中的偏移
 } Section;
 
+struct Symbol;
 // function declaration
 Section *GetSections(Elf32_File *);
 void InsertSectionAfterSection(Section *, Section *);
 Section *GetSectionByName(Section *, UINT8 *);
 void CreateSections(Section *);
 void UpdateInterpSection(Section *, char *);
+void UpdateDynstrSection(Section *, struct Symbol *, char *);
+void UpdateDynsymSection(Section *, struct Symbol *);
+void UpdateGVSection(Section *, struct Symbol *);
+void UpdateHashSection(Section *, struct Symbol *);
+void UpdateGNRSection(Section *, struct Symbol *, char *);
 #endif

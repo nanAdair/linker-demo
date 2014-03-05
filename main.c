@@ -61,10 +61,19 @@ int main(int argc, char *argv[])
     CreateSections(sec_list);
     
     UpdateInterpSection(sec_list, ld_filename);
+    UpdateDynstrSection(sec_list, dyn_sym_list, so_filename);
+    UpdateDynsymSection(sec_list, dyn_sym_list);
+    UpdateGVSection(sec_list, dyn_sym_list);
+    UpdateHashSection(sec_list, dyn_sym_list);
+    UpdateGNRSection(sec_list, dyn_sym_list, so_filename);
     
     /*showSection(sec_list);*/
     Section *test;
-    test = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    /*test = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, GV_SECTION_NAME);*/
+    test = GetSectionByName(sec_list, GNR_SECTION_NAME);
     showSectionData(test);
 }
 

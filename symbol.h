@@ -1,3 +1,4 @@
+
 /*
  * =====================================================================================
  *
@@ -19,7 +20,7 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-#include "elf.h"
+#include <elf.h>
 #include "type.h"
 #include "file.h"
 #include "section.h"
@@ -28,7 +29,8 @@
 typedef enum {
     SYM_LOCAL,
     SYM_GOT,
-    SYM_PLT
+    SYM_PLT,
+    SYM_OUT
 } SYM_SD_TYPE;
 
 typedef struct Symbol {
@@ -42,7 +44,8 @@ typedef struct Symbol {
 } Symbol;
 
 // function declaration
-Symbol *GetSymbols(Elf32_File *, Section *);
+struct Section;
+Symbol *GetSymbols(Elf32_File *, struct Section *);
 void InsertSymbolAfterSymbol(Symbol *, Symbol *);
 Symbol *MakeDynSymbol(Symbol *, Symbol *);
 
