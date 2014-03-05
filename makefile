@@ -13,4 +13,4 @@ version.o: version.c
 symbol.o: symbol.c
 	gcc -c symbol.c
 clean:
-	rm main *.o
+	rm -rf main *.o *~

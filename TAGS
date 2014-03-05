@@ -1,0 +1,167 @@
+
+version.h,625
+#define VERSION_H20,488
+typedef struct Version_Def 26,566
+    UINT16 vd_version;27,595
+    UINT16 vd_flags;28,618
+    UINT16 vd_ndx;29,639
+    UINT16 vd_cnt;30,658
+    UINT32 vd_hash;31,677
+    UINT32 vd_aux;32,697
+    UINT32 vd_offset_next;33,716
+} Version_Def;34,743
+typedef struct Vd_item{Vd_item36,759
+    struct Vd_item *vd_prev;vd_prev37,783
+    struct Vd_item *vd_next;vd_next38,812
+    Version_Def *vd_content;vd_content39,841
+    UINT8 *vd_version_name;vd_version_name40,870
+} Vd_item;41,898
+typedef struct Vd_Aux 43,910
+    UINT32 vda_name;44,934
+    UINT32 vda_next;45,955
+} Vd_Aux;46,976
+
+global.h,24
+#define GLOBAL_H20,456
+
+utils.c,28
+int GetDynDataByTag(23,500
+
+section.h,1286
+#define SECTION_H19,467
+#define MAGIC 24,523
+#define INTERP_SECTION_NAME 27,566
+#define HASH_SECTION_NAME 28,608
+#define DYNSYM_SECTION_NAME 29,648
+#define DYNSTR_SECTION_NAME 30,690
+#define GV_SECTION_NAME 31,732
+#define GNR_SECTION_NAME 32,779
+#define REL_DYN_SECTION_NAME 33,828
+#define REL_PLT_SECTION_NAME 34,871
+#define PLT_SECTION_NAME 35,914
+#define DYNAMIC_SECTION_NAME 36,953
+#define GOT_SECTION_NAME 37,996
+#define GOT_PLT_SECTION_NAME 38,1035
+typedef struct Section 40,1079
+    UINT16 sec_number;41,1104
+    struct Section *sec_prev;sec_prev42,1127
+    struct Section *sec_next;sec_next43,1157
+    struct Section *sec_mergeto;sec_mergeto44,1187
+    struct Section *sec_relsec;sec_relsec45,1220
+    UINT8 *sec_data;sec_data46,1252
+    UINT8 *sec_newdata;sec_newdata47,1273
+    UINT32 sec_datasize;48,1297
+    UINT32 sec_newdatasize;49,1322
+    UINT32 sec_delta;50,1350
+    UINT32 sec_address;51,1412
+    UINT32 sec_newaddress;52,1436
+    UINT8 *sec_name;sec_name53,1463
+    UINT32 sec_type;54,1484
+    UINT32 sec_flags;55,1505
+    UINT32 sec_link;56,1527
+    UINT32 sec_info;57,1548
+    UINT32 sec_align;58,1569
+    UINT32 sec_entsize;59,1591
+    UINT32 sec_name_offset;60,1615
+    UINT32 sec_file_offset;61,1677
+} Section;62,1730
+
+symbol.c,251
+Symbol *GetSymbols(GetSymbols28,636
+void InsertSymbolAfterSymbol(117,4096
+Symbol *MakeDynSymbol(MakeDynSymbol129,4450
+static void MarkDynSymbol(160,5289
+static Symbol *CopySymbolData(CopySymbolData213,7584
+static void showSymbolInfo(234,8437
+
+main.c,103
+int main(28,662
+void showSectionInfo(71,1904
+void showSection(83,2295
+void showSectionData(97,2586
+
+utils.h,165
+#define UTILS_H20,438
+typedef struct Dyn 25,495
+    INT32 d_tag;26,516
+        UINT32 d_val;28,545
+        UINT32 d_ptr;29,567
+    } d_un;30,589
+} Dyn;31,601
+
+convert.h,25
+#define CONVERT_H20,491
+
+convert.c,82
+Elf32_File *GetBinaryFileData(GetBinaryFileData29,690
+void FillElfData(67,1597
+
+type.h,267
+typedef unsigned char   UINT8;20,469
+typedef unsigned short  UINT16;21,500
+typedef unsigned int    UINT32;22,532
+typedef char            INT8;23,564
+typedef short           INT16;24,594
+typedef int             INT32;25,625
+typedef long long       INT64;26,656
+
+symbol.h,448
+#define SYMBOL_H20,466
+    SYM_LOCAL,29,595
+    SYM_GOT,30,610
+    SYM_PLT31,623
+} SYM_SD_TYPE;32,635
+typedef struct Symbol 34,651
+    struct Symbol *sym_prev;sym_prev35,675
+    struct Symbol *sym_next;sym_next36,704
+    UINT8 *sym_name;sym_name37,733
+    Elf32_Sym *sym_content;sym_content38,754
+    SYM_SD_TYPE sym_sd_type;39,782
+    UINT16 sym_version;40,811
+    UINT8 *sym_version_name;sym_version_name41,835
+} Symbol;42,864
+
+version.c,296
+Vd_item *GetSymbolVersions(GetSymbolVersions25,548
+Vd_item *FillVersionData(FillVersionData43,1040
+UINT8 *FillVersionName(FillVersionName88,2383
+UINT8 GetVersionNumber(99,2642
+UINT8 *GetVersionName(GetVersionName107,2818
+void FreeVersionsData(122,3133
+static void showVersion(141,3533
+
+sectionGD.h,168
+#define SECTIONGD_H20,465
+#define ADDEDSECTIONNUMBER 23,503
+UINT8 *AddedSectionsName[AddedSectionsName25,534
+Elf32_Shdr AddedSectionsInfo[AddedSectionsInfo40,857
+
+section.c,238
+Section *GetSections(GetSections26,595
+void InsertSectionAfterSection(78,2670
+Section *GetSectionByName(GetSectionByName89,2974
+void CreateSections(105,3359
+void UpdateInterpSection(137,4600
+static void FillInterpSection(145,4804
+
+file.h,889
+#define FILE_H20,489
+    BINARY_CORE_TYPE,26,556
+    BINARY_SHARED_TYPE,27,578
+    BINARY_RELOCATABLE_TYPE,28,602
+    BINARY_EXECUTABLE_TYPE29,631
+} BINARY_TYPE;30,658
+typedef struct Elf32_File 33,702
+    Elf32_Ehdr *elf_file_header;elf_file_header34,730
+    Elf32_Shdr *elf_section_table;elf_section_table36,768
+    UINT8 *elf_section_strn_table;elf_section_strn_table37,803
+    Elf32_Shdr *elf_sym_table_dr;elf_sym_table_dr39,839
+    UINT8 *elf_sym_strn_table;elf_sym_strn_table40,873
+    Elf32_Sym *elf_sym_table;elf_sym_table41,904
+    Elf32_Shdr *elf_dyn_sym_table_dr;elf_dyn_sym_table_dr43,939
+    UINT8 *elf_dyn_sym_strn_table;elf_dyn_sym_strn_table44,977
+    Elf32_Sym *elf_dyn_sym_table;elf_dyn_sym_table45,1012
+    UINT8 *elf_file_data;elf_file_data47,1051
+    UINT32 elf_file_size;48,1077
+    BINARY_TYPE elf_file_type;49,1103
+} Elf32_File;50,1134
