@@ -19,8 +19,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "section.h"
+#include "sectionGD.h"
 #include "file.h"
 
+static void FillInterpSection(Section *, char *);
 Section *GetSections(Elf32_File *elf_file)
 {
     Section *cur_section, *last_section, *first_section;
@@ -99,3 +101,57 @@ Section *GetSectionByName(Section *sec_list, UINT8 *sec_name)
     printf("error the %s section doesn't exits\n", sec_name);
     exit(EXIT_FAILURE);
 }
+
+void CreateSections(Section *sec_list)
+{
+    Section *tail_sec;
+    tail_sec = sec_list;
+    
+    while (tail_sec->sec_next != NULL)
+        tail_sec = tail_sec->sec_next;
+    
+    int i;
+    for (i = 0; i < ADDEDSECTIONNUMBER; i++) {
+        Section *new_section;
+        new_section = (Section *)malloc(sizeof(Section));
+        
+        new_section->sec_type = AddedSectionsInfo[i].sh_type;
+        new_section->sec_flags = AddedSectionsInfo[i].sh_flags;
+        new_section->sec_address = AddedSectionsInfo[i].sh_addr;
+        new_section->sec_file_offset = AddedSectionsInfo[i].sh_offset;
+        new_section->sec_datasize = AddedSectionsInfo[i].sh_size;
+        new_section->sec_link = AddedSectionsInfo[i].sh_link;
+        new_section->sec_info = AddedSectionsInfo[i].sh_info;
+        new_section->sec_align = AddedSectionsInfo[i].sh_addralign;
+        new_section->sec_entsize = AddedSectionsInfo[i].sh_entsize;
+        
+        new_section->sec_name = (UINT8 *)malloc(strlen(AddedSectionsName[i]) + 1);
+        strcpy(new_section->sec_name, AddedSectionsName[i]);
+        
+        new_section->sec_number = tail_sec->sec_number + 1;
+        InsertSectionAfterSection(new_section, tail_sec);
+        tail_sec = new_section;
+    }
+}
+
+void UpdateInterpSection(Section *sec_list, char *ld_path)
+{
+    Section *interp_sec;
+    interp_sec = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    
+    FillInterpSection(interp_sec, ld_path);
+}
+
+static void FillInterpSection(Section *interp_sec, char *ld_path)
+{
+    int length;
+    length = strlen(ld_path);
+    interp_sec->sec_data = (UINT8 *)malloc(length + 1);
+    interp_sec->sec_datasize = interp_sec->sec_newdatasize = length + 1;
+    strcpy(interp_sec->sec_data, ld_path);
+}
+
+/*void FillDynstrSection(Section *dynstr_sec, Symbol *dynsym_list, char *so_file_name)*/
+/*{*/
+    /*Symbol *cur_sym;k*/
+/*}*/

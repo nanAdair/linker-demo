@@ -153,7 +153,7 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
         sym_target = sym_target->sym_next;
     }
     
-    showSymbolInfo(first_symbol);
+    /*showSymbolInfo(first_symbol);*/
     return first_symbol;
 }
 

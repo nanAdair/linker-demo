@@ -24,6 +24,7 @@
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections);
 void showSection(Section *section);
+void showSectionData(Section *);
 int main(int argc, char *argv[])
 {
     char obj_filename[100], so_filename[100], ld_filename[100];
@@ -34,7 +35,7 @@ int main(int argc, char *argv[])
     
     strcpy(obj_filename, argv[1]);
     strcpy(so_filename, argv[2]);
-    /*strcpy(ld_filename, argv[3]);*/
+    strcpy(ld_filename, argv[3]);
     
     Elf32_File *obj_file, *so_file;
     obj_file = GetBinaryFileData(obj_filename);
@@ -49,14 +50,22 @@ int main(int argc, char *argv[])
     Section *so_sec_list;
     so_sec_list = GetSections(so_file);
     
-    Symbol *sym_list, *so_sym_list;
+    Symbol *sym_list, *so_sym_list, *dyn_sym_list;
     
     sym_list = GetSymbols(obj_file, sec_list);
     so_sym_list = GetSymbols(so_file, so_sec_list);
     
-    MakeDynSymbol(sym_list, so_sym_list);
+    dyn_sym_list = MakeDynSymbol(sym_list, so_sym_list);
     
     /*showSection(sec_list);*/
+    CreateSections(sec_list);
+    
+    UpdateInterpSection(sec_list, ld_filename);
+    
+    /*showSection(sec_list);*/
+    Section *test;
+    test = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    showSectionData(test);
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
@@ -84,3 +93,14 @@ void showSection(Section *section)
         i++;
     }
 }
+
+void showSectionData(Section *sec)
+{
+    FILE *output;
+    output = fopen("output", "wb");
+    
+    fwrite(sec->sec_data, sec->sec_datasize, 1, output);
+    
+    fclose(output);
+}
+
