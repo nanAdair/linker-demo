@@ -1,8 +1,8 @@
 main: main.o convert.o section.o utils.o version.o symbol.o
 	gcc -o main main.o convert.o section.o utils.o version.o symbol.o
-main.o: main.c  
+main.o: main.c
 	gcc -c main.c
-convert.o: convert.c
+convert.o: convert.c 
 	gcc -c convert.c
 section.o: section.c
 	gcc -c section.c
