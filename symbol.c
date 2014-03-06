@@ -74,6 +74,8 @@ Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
             cur_symbol->sym_sd_type = SYM_LOCAL;
             cur_symbol->sym_version = 0;
             cur_symbol->sym_version_name = NULL;
+            
+            cur_symbol->sym_id = i;
         }
         
         if (elf_file->elf_file_type == BINARY_SHARED_TYPE) {
@@ -93,6 +95,8 @@ Symbol *GetSymbols(Elf32_File *elf_file, Section *sec_list)
                 cur_symbol->sym_version_name = (UINT8 *)malloc(strlen(version_name) + 1);
                 strcpy(cur_symbol->sym_version_name, version_name);
             }
+            
+            cur_symbol->sym_id = i;
         }
 
         if (first_symbol == NULL) {
@@ -133,6 +137,7 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
     
     MarkDynSymbol(sym_target, sym_source);
     
+    int i = 0;
     while (sym_target) {
         if (sym_target->sym_sd_type == SYM_LOCAL) {
             sym_target = sym_target->sym_next;
@@ -140,6 +145,9 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
         }
         
         cur_symbol = CopySymbolData(sym_target);
+        
+        cur_symbol->sym_id = i;
+        i++;
         
         if (first_symbol == NULL) {
             first_symbol = cur_symbol;
@@ -152,7 +160,7 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
         sym_target = sym_target->sym_next;
     }
     
-    /*showSymbolInfo(first_symbol);*/
+    showSymbolInfo(first_symbol);
     return first_symbol;
 }
 
@@ -258,15 +266,15 @@ static void showSymbolInfo(Symbol *symbol)
         /*printf("%d: ", cur_symbol->sym_binding);*/
         /*printf("%d  ", cur_symbol->sym_shndx);*/
         if (cur_symbol->sym_sd_type == SYM_GOT) {
-            printf("%d GOT  %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version);
+            printf("%d GOT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);
             printf("\n");
         }
         if (cur_symbol->sym_sd_type == SYM_PLT) {
-            printf("%d PLT %s %d %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);
+            printf("%d PLT %s %d %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);
             printf("\n");
         }
         if (cur_symbol->sym_sd_type == SYM_OUT) {
-            printf("%d OUT  %s %d", i, cur_symbol->sym_name, cur_symbol->sym_version);
+            printf("%d OUT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);
             printf("\n");
         }
         

@@ -21,6 +21,7 @@
 #include "type.h"
 #include "file.h"
 #include "symbol.h"
+#include "instr.h"
 
 #define MAGIC (-1)
 
@@ -37,6 +38,9 @@
 #define DYNAMIC_SECTION_NAME    ".dynamic"
 #define GOT_SECTION_NAME        ".got"
 #define GOT_PLT_SECTION_NAME    ".got.plt"
+
+#define DYNAMIC_NUMBER 28
+#define DYNAMIC_ENTSIZE 8
 
 typedef struct Section {
     UINT16 sec_number;
@@ -65,13 +69,18 @@ typedef struct Section {
 struct Symbol;
 // function declaration
 Section *GetSections(Elf32_File *);
-void InsertSectionAfterSection(Section *, Section *);
 Section *GetSectionByName(Section *, UINT8 *);
 void CreateSections(Section *);
 void UpdateInterpSection(Section *, char *);
 void UpdateDynstrSection(Section *, struct Symbol *, char *);
 void UpdateDynsymSection(Section *, struct Symbol *);
 void UpdateGVSection(Section *, struct Symbol *);
-void UpdateHashSection(Section *, struct Symbol *);
+//void UpdateHashSection(Section *, struct Symbol *);
+void UpdateHashSection(Section *, struct Symbol *, Section *);
 void UpdateGNRSection(Section *, struct Symbol *, char *);
+void UpdatePLTRelatedSections(Section *, struct Symbol *);
+void UpdateGOTRelatedSections(Section *, struct Symbol *);
+void UpdateDynamicSection(Section *, int);
+
+void MergeSection(Section *);
 #endif

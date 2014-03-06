@@ -27,7 +27,7 @@ void showSection(Section *section);
 void showSectionData(Section *);
 int main(int argc, char *argv[])
 {
-    char obj_filename[100], so_filename[100], ld_filename[100];
+    char obj_filename[100], so_filename[100], ld_filename[100], temp_filename[100];
     if (argc < 2) {
         printf("error in command usage\n");
         exit(EXIT_FAILURE);
@@ -37,15 +37,28 @@ int main(int argc, char *argv[])
     strcpy(so_filename, argv[2]);
     strcpy(ld_filename, argv[3]);
     
-    Elf32_File *obj_file, *so_file;
+    Elf32_File *obj_file, *so_file, *temp_file;
     obj_file = GetBinaryFileData(obj_filename);
     so_file = GetBinaryFileData(so_filename);
+    
+
+    strcpy(temp_filename, argv[4]);
+    temp_file = GetBinaryFileData(temp_filename);
+    Section *temp_list;
+    temp_list = GetSections(temp_file);
+    Section *hash;
+    hash = GetSectionByName(temp_list, ".hash");
+    /*Section *test;*/
+    /*test = GetSectionByName(temp_list, ".hash");*/
+    /*showSectionData(test);*/
+    
     
     /*showSectionInfo(obj_file->elf_section_table, obj_file->elf_file_header->e_shnum);*/
     /*showSectionInfo(so_file->elf_section_table, so_file->elf_file_header->e_shnum);*/
     
     Section *sec_list;
     sec_list = GetSections(obj_file);
+    MergeSection(sec_list);
 
     Section *so_sec_list;
     so_sec_list = GetSections(so_file);
@@ -60,21 +73,40 @@ int main(int argc, char *argv[])
     /*showSection(sec_list);*/
     CreateSections(sec_list);
     
+    //.interp
     UpdateInterpSection(sec_list, ld_filename);
+    //.dynstr
     UpdateDynstrSection(sec_list, dyn_sym_list, so_filename);
+    //.dynsym
     UpdateDynsymSection(sec_list, dyn_sym_list);
+    //.gnu.version
     UpdateGVSection(sec_list, dyn_sym_list);
-    UpdateHashSection(sec_list, dyn_sym_list);
+    //.hash
+    /*UpdateHashSection(sec_list, dyn_sym_list);*/
+    /* TODO: Faked content of hash section */
+    UpdateHashSection(sec_list, dyn_sym_list, hash);
+    //.gnu.version_r
     UpdateGNRSection(sec_list, dyn_sym_list, so_filename);
+    //.plt, .got.plt, rel.plt
+    UpdatePLTRelatedSections(sec_list, dyn_sym_list);
+    //.got, .rel.dyn
+    UpdateGOTRelatedSections(sec_list, dyn_sym_list);
+    //.dynamic
+    UpdateDynamicSection(sec_list, 1);
+    /*UpdateDynamicSection(sec_list, 1);*/
     
     /*showSection(sec_list);*/
-    Section *test;
+    /*Section *test;*/
     /*test = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, GV_SECTION_NAME);*/
-    test = GetSectionByName(sec_list, GNR_SECTION_NAME);
-    showSectionData(test);
+    /*test = GetSectionByName(sec_list, GNR_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, PLT_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
+    /*showSectionData(test);*/
+    showSection(sec_list);
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
@@ -97,7 +129,7 @@ void showSection(Section *section)
     int i = 0;
     
     while (cur_section != NULL) {
-        printf("%d %s\n", cur_section->sec_number, cur_section->sec_name);
+        printf("%d %s %x\n", cur_section->sec_number, cur_section->sec_name, cur_section->sec_datasize);
         cur_section = cur_section->sec_next;
         i++;
     }

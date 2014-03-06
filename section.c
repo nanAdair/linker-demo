@@ -18,6 +18,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <elf.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "section.h"
 #include "sectionGD.h"
 
@@ -32,8 +36,18 @@ static void AddDynstrEntryFromVersion(Section *, Symbol *);
 static void AddDynsymEntry(Section *, Symbol *);
 static void AddGVEntry(Section *, Symbol *);
 static void AddGNREntry(Section *, Symbol *, Section *, int);
+static void AddGOTPLTTop(Section *);
+static void AddPLTTop(Section *);
+static void AddPLTEntry(Section *, int);
+static void AddGOTorGOTPLTEntry(Section *);
+static void AddRelPLTEntry(Section *, Symbol *, int);
+static void AddRelGOTEntry(Section *, Symbol *, int);
 static UINT32 CalculateHash(const UINT8 *);
 static int FindOffset(Section *, char *);
+
+static void InsertSectionAfterSection(Section *new_section, Section *section);
+static void DeleteSection(Section *);
+static void MergeTwoSections(Section *target, Section *source);
 
 Section *GetSections(Elf32_File *elf_file)
 {
@@ -87,7 +101,7 @@ Section *GetSections(Elf32_File *elf_file)
 }
 
 // new_section is inserted after section
-void InsertSectionAfterSection(Section *new_section, Section *section)
+static void InsertSectionAfterSection(Section *new_section, Section *section)
 {
     new_section->sec_prev = section;
     new_section->sec_next = section->sec_next;
@@ -286,24 +300,53 @@ static void AddDynsymEntry(Section *dynsym, Symbol *sym)
 }
 
 /* TODO: Can't understand the algorithm here now' */
-void UpdateHashSection(Section *sec_list, Symbol *sym_list)
+void UpdateHashSection(Section *sec_list, Symbol *sym_list, Section *hash)
 {
     Section *hash_sec;
     hash_sec = GetSectionByName(sec_list, HASH_SECTION_NAME);
     
-    FillHashSection(hash_sec, sym_list);
+    /*FillHashSection(hash_sec, sym_list);*/
+    int datasize = hash->sec_datasize;
+    hash_sec->sec_data = (UINT8 *)malloc(datasize);
+    memset(hash_sec->sec_data, 0x0, datasize);
+    memcpy(hash_sec->sec_data, hash->sec_data, datasize);
+    hash_sec->sec_datasize = datasize;
 }
 
+/* TODO: Replace the content using a file temporaly */
 static void FillHashSection(Section *hash_sec, Symbol *sym_list)
 {
     Symbol *cur_sym;
     cur_sym = sym_list;
     
     while (cur_sym) {
-        
         printf("%d\n", CalculateHash(cur_sym->sym_name));
         cur_sym = cur_sym->sym_next;
     }
+    
+    /*FILE *file;*/
+    /*file = fopen("hash", "rb");*/
+    /*if (file == NULL) {*/
+        /*printf("error opening hash file\n");*/
+        /*exit(EXIT_FAILURE);*/
+    /*}*/
+    
+    /*struct stat fs;*/
+    /*if (stat("hash", &fs) == -1) {*/
+        /*printf("error reading hash file meta data\n");*/
+        /*exit(EXIT_FAILURE);*/
+    /*}*/
+    
+    /*UINT32 datasize;*/
+    /*datasize = fs.st_size;*/
+    
+    /*hash_sec->sec_data = (UINT8 *)malloc(datasize);*/
+    /*hash_sec->sec_datasize = datasize;*/
+    /*if (fread(hash_sec->sec_data, datasize, 1, file) != datasize) {*/
+        /*printf("error in reading hash file data\n");*/
+        /*exit(EXIT_FAILURE);*/
+    /*}*/
+    /*fclose(file);*/
 }
     
 static UINT32 CalculateHash(const UINT8 *name)
@@ -459,3 +502,264 @@ static int FindOffset(Section *dynstr, char *str)
     
     return offset;
 }
+
+static void AddGOTPLTTop(Section *gotplt)
+{
+    int datasize, addition;
+    UINT8 *buffer;
+    
+    addition = 0xc;
+    buffer = (UINT8 *)malloc(addition);
+    memset(buffer, 0x0, addition);
+    
+    datasize = addition;
+
+    gotplt->sec_data = buffer;
+    gotplt->sec_datasize = datasize;
+}
+
+void UpdatePLTRelatedSections(Section *sec_list, Symbol *sym_list)
+{
+    Section *plt, *gotplt, *relplt;
+    plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    relplt = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);
+    
+    AddPLTTop(plt);
+    AddGOTPLTTop(gotplt);
+    
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    int plt_number = 0;
+    
+    while (cur_sym) {
+        if (cur_sym->sym_sd_type == SYM_PLT) {
+            AddPLTEntry(plt, plt_number);
+            AddRelPLTEntry(relplt, cur_sym, plt_number);
+            AddGOTorGOTPLTEntry(gotplt);
+            plt_number += 1;
+        }
+
+        cur_sym = cur_sym->sym_next;
+    }
+}
+
+void UpdateGOTRelatedSections(Section *sec_list, Symbol *sym_list)
+{
+    Section *got, *reldyn;
+    got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+    reldyn = GetSectionByName(sec_list, REL_DYN_SECTION_NAME);
+    
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    int got_number = 0;
+    
+    while (cur_sym) {
+        if (cur_sym->sym_sd_type == SYM_GOT) {
+            AddGOTorGOTPLTEntry(got);
+            AddRelGOTEntry(reldyn, cur_sym, got_number);
+            got_number += 1;
+        }
+        cur_sym = cur_sym->sym_next;
+    }
+}
+
+static void AddPLTTop(Section *plt)
+{
+    Instr instr[2];
+    int i, offset;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(0x10);
+    memset(buffer, 0x0, 0x10);
+    
+    instr[0].opcode = 0x35ff;
+    instr[0].oprand = 0x0;
+    instr[1].opcode = 0x25ff;
+    instr[1].oprand = 0x0;
+    
+    offset = 0;
+    for (i = 0; i < 2; i++) {
+        memcpy(buffer + offset, &(instr[i].opcode), 0x2);
+        offset += 2;
+        memcpy(buffer + offset, &(instr[i].oprand), 0x4);
+        offset += 4;
+    }
+    
+    plt->sec_data = buffer;
+    plt->sec_datasize = 0x10;
+}
+
+static void AddPLTEntry(Section *plt, int n)
+{
+    Instr instr[3];
+    
+    instr[0].opcode = 0x25ff;
+    instr[0].oprand = 0x0;
+    instr[1].opcode = 0x68;
+    instr[1].oprand = n * 0x8;
+    instr[2].opcode = 0xe9;
+    instr[2].oprand = 0x0;
+    
+    int i, offset, datasize, newdatasize;
+    datasize = plt->sec_datasize;
+    newdatasize = datasize + 0x10;
+    i = offset = 0;
+    
+    UINT8 *buffer, *bufferOff;
+    buffer = (UINT8 *)malloc(newdatasize);
+    memset(buffer, 0x0, 0x10);
+    memcpy(buffer, plt->sec_data, datasize);
+    bufferOff = buffer + datasize;
+    
+    memcpy(bufferOff + offset, &(instr[0].opcode), 2);
+    offset += 2;
+    memcpy(bufferOff + offset, &(instr[0].oprand), 4);
+    offset += 4;
+    
+    /* Trick: write one byte for opcode */
+    for (i = 1; i < 3; i++) {
+        memcpy(bufferOff + offset, &(instr[i].opcode), 1);
+        offset += 1;
+        memcpy(bufferOff + offset, &(instr[i].oprand), 4);
+        offset += 4;
+    }
+    
+    free(plt->sec_data);
+    plt->sec_data = buffer;
+    plt->sec_datasize = newdatasize;
+}
+
+static void AddGOTorGOTPLTEntry(Section *sec)
+{
+    int datasize, addition, newdatasize;
+    addition = 0x4;
+    datasize = sec->sec_datasize;
+    newdatasize = datasize + addition;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(newdatasize);
+    memset(buffer, 0x0, newdatasize);
+    memcpy(buffer, sec->sec_data, datasize);
+    
+    free(sec->sec_data);
+    sec->sec_data = buffer;
+    sec->sec_datasize = newdatasize;
+}
+
+static void AddRelPLTEntry(Section *relplt, Symbol *sym, int n)
+{
+    Elf32_Rel cur_rel;
+    int datasize, addition, newdatasize;
+    
+    datasize = relplt->sec_datasize;
+    addition = sizeof(Elf32_Rel);
+    newdatasize = datasize + addition;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(newdatasize);
+    memset(buffer, 0x0, newdatasize);
+    memcpy(buffer, relplt->sec_data, datasize);
+    
+    cur_rel.r_offset = 0xc + 4 * n;
+    cur_rel.r_info = (sym->sym_id << 8) + R_386_JMP_SLOT;
+    
+    memcpy(buffer + datasize, &cur_rel, addition);
+    
+    free(relplt->sec_data);
+    relplt->sec_data = buffer;
+    relplt->sec_datasize = newdatasize;
+}
+
+static void AddRelGOTEntry(Section *relgot, Symbol *sym, int n)
+{
+    Elf32_Rel cur_rel;
+    int datasize, addition, newdatasize;
+    
+    datasize = relgot->sec_datasize;
+    addition = sizeof(Elf32_Rel);
+    newdatasize = datasize + addition;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(newdatasize);
+    memset(buffer, 0x0, newdatasize);
+    memcpy(buffer, relgot->sec_data, datasize);
+    
+    cur_rel.r_offset = 4 * n;
+    cur_rel.r_info = (sym->sym_id << 8) + R_386_GLOB_DAT;
+    
+    memcpy(buffer + datasize, &cur_rel, addition);
+    
+    free(relgot->sec_data);
+    relgot->sec_data = buffer;
+    relgot->sec_datasize = newdatasize;
+}
+
+void UpdateDynamicSection(Section *sec_list, int number)
+{
+    Section *dynamic;
+    dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
+    
+    UINT8 *buffer;
+    int datasize;
+    datasize = DYNAMIC_ENTSIZE * (DYNAMIC_NUMBER + number);
+    buffer = (UINT8 *)malloc(datasize);
+    memset(buffer, 0x0, datasize);
+    
+    dynamic->sec_data = buffer;
+    dynamic->sec_datasize = datasize;
+}
+
+void MergeSection(Section *sec_list)
+{
+    Section *cur_sec, *last_sec;
+    cur_sec = sec_list;
+    
+    while (cur_sec) {
+        if (cur_sec->sec_flags & SHF_MERGE) {
+            /* TODO: modify the comment content */
+            if (!strcmp(cur_sec->sec_name,".comment")) {
+                /*MergeCommentSection(cur_sec);*/
+            }
+            else
+                MergeTwoSections(last_sec, cur_sec);
+        }
+
+        last_sec = cur_sec;
+        cur_sec = cur_sec->sec_next;
+    }
+}
+
+static void MergeTwoSections(Section *target, Section *source)
+{
+    UINT8 *buffer;
+    UINT8 target_datasize, source_datasize, target_newdatasize;
+    target_datasize = target->sec_datasize;
+    source_datasize = source->sec_datasize;
+    target_newdatasize = target_datasize + source_datasize;
+    
+    buffer = (UINT8 *)malloc(target_newdatasize);
+    memset(buffer, 0x0, target_newdatasize);
+    memcpy(buffer, target->sec_data, target_datasize);
+    memcpy(buffer + target_datasize, source->sec_data, source_datasize);
+    
+    free(target->sec_data);
+    target->sec_data = buffer;
+    target->sec_datasize = target_newdatasize;
+    
+    DeleteSection(source);
+}
+
+static void DeleteSection(Section *useless)
+{
+    Section *head, *tail;
+    head = useless->sec_prev;
+    tail = useless->sec_next;
+    head->sec_next = tail;
+    tail->sec_prev = head;
+    
+    free(useless->sec_data);
+    free(useless->sec_name);
+    free(useless);
+}
+

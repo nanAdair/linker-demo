@@ -36,6 +36,7 @@ typedef enum {
 typedef struct Symbol {
     struct Symbol *sym_prev;
     struct Symbol *sym_next;
+    UINT32 sym_id;
     UINT8 *sym_name;
     Elf32_Sym *sym_content;
     SYM_SD_TYPE sym_sd_type;
