@@ -32,5 +32,6 @@ typedef struct Dyn {
 
 struct Section;
 int GetDynDataByTag(struct Section *, int);
-
+struct Section *SortSectionsByWriteOrder(struct Section *);
+void AllocateAddress(struct Section *);
 #endif

@@ -39,6 +39,12 @@
 #define GOT_SECTION_NAME        ".got"
 #define GOT_PLT_SECTION_NAME    ".got.plt"
 
+#define TEXT_SECTION_NAME       ".text"
+#define INIT_SECTION_NAME       ".init"
+#define FINI_SECTION_NAME       ".fini"
+#define INIT_ARRAY_SECTION_NAME ".init_array"
+#define FINI_ARRAY_SECTION_NAME ".fini_array"
+
 #define DYNAMIC_NUMBER 28
 #define DYNAMIC_ENTSIZE 8
 
@@ -64,12 +70,14 @@ typedef struct Section {
     UINT32 sec_entsize;
     UINT32 sec_name_offset; // 在段字符串表中的偏移
     UINT32 sec_file_offset; // 在文件中的偏移
+    UINT32 sec_misc; // 用来保存段的优先级
 } Section;
 
 struct Symbol;
 // function declaration
 Section *GetSections(Elf32_File *);
 Section *GetSectionByName(Section *, UINT8 *);
+void InsertSectionAfterSection(Section *, Section *);
 void CreateSections(Section *);
 void UpdateInterpSection(Section *, char *);
 void UpdateDynstrSection(Section *, struct Symbol *, char *);
@@ -82,5 +90,5 @@ void UpdatePLTRelatedSections(Section *, struct Symbol *);
 void UpdateGOTRelatedSections(Section *, struct Symbol *);
 void UpdateDynamicSection(Section *, int);
 
-void MergeSection(Section *);
+Section *MergeSection(Section *);
 #endif

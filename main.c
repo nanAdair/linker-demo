@@ -56,9 +56,10 @@ int main(int argc, char *argv[])
     /*showSectionInfo(obj_file->elf_section_table, obj_file->elf_file_header->e_shnum);*/
     /*showSectionInfo(so_file->elf_section_table, so_file->elf_file_header->e_shnum);*/
     
-    Section *sec_list;
+    Section *sec_list, *merge_list;
+    merge_list = NULL;
     sec_list = GetSections(obj_file);
-    MergeSection(sec_list);
+    merge_list = MergeSection(sec_list);
 
     Section *so_sec_list;
     so_sec_list = GetSections(so_file);
@@ -93,7 +94,9 @@ int main(int argc, char *argv[])
     UpdateGOTRelatedSections(sec_list, dyn_sym_list);
     //.dynamic
     UpdateDynamicSection(sec_list, 1);
-    /*UpdateDynamicSection(sec_list, 1);*/
+    
+    sec_list = SortSectionsByWriteOrder(sec_list);
+    AllocateAddress(sec_list);
     
     /*showSection(sec_list);*/
     /*Section *test;*/
@@ -106,7 +109,9 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
     /*showSectionData(test);*/
-    showSection(sec_list);
+    /*showSection(sec_list);*/
+    printf("\n");
+    showSection(merge_list);
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
@@ -129,7 +134,9 @@ void showSection(Section *section)
     int i = 0;
     
     while (cur_section != NULL) {
-        printf("%d %s %x\n", cur_section->sec_number, cur_section->sec_name, cur_section->sec_datasize);
+        printf("%d %s %x %x %x \n", cur_section->sec_number, cur_section->sec_name, cur_section->sec_datasize, cur_section->sec_address, cur_section->sec_file_offset);
+        printf("%x\n", cur_section->sec_delta);
+        /*printf("%d %s\n", cur_section->sec_number, cur_section->sec_name);*/
         cur_section = cur_section->sec_next;
         i++;
     }

@@ -45,9 +45,10 @@ static void AddRelGOTEntry(Section *, Symbol *, int);
 static UINT32 CalculateHash(const UINT8 *);
 static int FindOffset(Section *, char *);
 
-static void InsertSectionAfterSection(Section *new_section, Section *section);
 static void DeleteSection(Section *);
-static void MergeTwoSections(Section *target, Section *source);
+static Section *MergeTwoSections(Section *, Section *);
+static int SkipXSection(UINT8 *name);
+static Section *CopySection(Section *);
 
 Section *GetSections(Elf32_File *elf_file)
 {
@@ -82,6 +83,7 @@ Section *GetSections(Elf32_File *elf_file)
         cur_section->sec_entsize = cur_sec_dr->sh_entsize;
         cur_section->sec_name_offset = cur_sec_dr->sh_name;
         cur_section->sec_file_offset = cur_sec_dr->sh_offset;
+        cur_section->sec_misc = i;
         
         int name_length = strlen(section_strn_table + cur_section->sec_name_offset);
         cur_section->sec_name = (UINT8 *)malloc(name_length + 1);
@@ -101,7 +103,7 @@ Section *GetSections(Elf32_File *elf_file)
 }
 
 // new_section is inserted after section
-static void InsertSectionAfterSection(Section *new_section, Section *section)
+void InsertSectionAfterSection(Section *new_section, Section *section)
 {
     new_section->sec_prev = section;
     new_section->sec_next = section->sec_next;
@@ -155,6 +157,7 @@ void CreateSections(Section *sec_list)
         strcpy(new_section->sec_name, AddedSectionsName[i]);
         
         new_section->sec_number = tail_sec->sec_number + 1;
+        new_section->sec_misc = 0;
         new_section->sec_data = NULL;
         InsertSectionAfterSection(new_section, tail_sec);
         tail_sec = new_section;
@@ -710,44 +713,106 @@ void UpdateDynamicSection(Section *sec_list, int number)
     dynamic->sec_datasize = datasize;
 }
 
-void MergeSection(Section *sec_list)
+Section *MergeSection(Section *sec_list)
 {
-    Section *cur_sec, *last_sec;
+    Section *cur_sec, *last_sec, *text, *next_sec, *rm_sec, *merge_list;
+    merge_list = NULL;
     cur_sec = sec_list;
+    text = GetSectionByName(sec_list, TEXT_SECTION_NAME);
     
+    int flag = 0;
     while (cur_sec) {
+        /*printf("%d %s %s\n", cur_sec->sec_number, cur_sec->sec_name, cur_sec->sec_next->sec_name);*/
         if (cur_sec->sec_flags & SHF_MERGE) {
             /* TODO: modify the comment content */
             if (!strcmp(cur_sec->sec_name,".comment")) {
                 /*MergeCommentSection(cur_sec);*/
             }
+            else {
+                next_sec = cur_sec->sec_next;
+                rm_sec = MergeTwoSections(last_sec, cur_sec);
+                flag = 1;
+                if (merge_list == NULL)
+                    merge_list = rm_sec;
+                else
+                    InsertSectionAfterSection(rm_sec, merge_list);
+            }
+        }
+        
+        if ((cur_sec->sec_flags & SHF_EXECINSTR) && !SkipXSection(cur_sec->sec_name)) {
+            next_sec = cur_sec->sec_next;
+            rm_sec = MergeTwoSections(text, cur_sec);
+            flag = 1;
+            if (merge_list == NULL)
+                merge_list = rm_sec;
             else
-                MergeTwoSections(last_sec, cur_sec);
+                InsertSectionAfterSection(rm_sec, merge_list);
         }
 
-        last_sec = cur_sec;
-        cur_sec = cur_sec->sec_next;
+        if (!flag) {
+            last_sec = cur_sec;
+            cur_sec = cur_sec->sec_next;
+        }
+        else {
+            cur_sec = next_sec;
+        }
+        flag = 0;
     }
+    
+    return merge_list;
 }
 
-static void MergeTwoSections(Section *target, Section *source)
+static int SkipXSection(UINT8 *name)
+{
+    UINT8 *sec_name[] = {
+        TEXT_SECTION_NAME,
+        INIT_SECTION_NAME,
+        FINI_SECTION_NAME
+    };
+    
+    int i;
+    for (i = 0; i < 3; i++) {
+        if (!strcmp(sec_name[i], name))
+            return 1;
+    }
+    return 0;
+}
+
+static Section *MergeTwoSections(Section *target, Section *source)
 {
     UINT8 *buffer;
-    UINT8 target_datasize, source_datasize, target_newdatasize;
+    int addition, num, i, target_datasize, source_datasize, target_newdatasize;
     target_datasize = target->sec_datasize;
     source_datasize = source->sec_datasize;
-    target_newdatasize = target_datasize + source_datasize;
+    
+    UINT32 source_align;
+    source_align = 1;
+    /*source_align <<= source->sec_align;*/
+    source_align = source->sec_align;
+        
+    addition = 0;
+    while ((target_datasize + addition) % source_align != 0) {
+        addition++;
+    }
+    target_newdatasize = target_datasize + source_datasize + addition;
     
     buffer = (UINT8 *)malloc(target_newdatasize);
     memset(buffer, 0x0, target_newdatasize);
     memcpy(buffer, target->sec_data, target_datasize);
-    memcpy(buffer + target_datasize, source->sec_data, source_datasize);
+    memcpy(buffer + target_datasize + addition, source->sec_data, source_datasize);
     
     free(target->sec_data);
     target->sec_data = buffer;
     target->sec_datasize = target_newdatasize;
     
+    source->sec_mergeto = target;
+    source->sec_delta = target_datasize + addition;
+    
+    Section *res;
+    res = CopySection(source);
     DeleteSection(source);
+    
+    return res;
 }
 
 static void DeleteSection(Section *useless)
@@ -763,3 +828,30 @@ static void DeleteSection(Section *useless)
     free(useless);
 }
 
+static Section *CopySection(Section *sec)
+{
+    Section *sec_shadow;
+    sec_shadow = malloc(sizeof(Section));
+    
+    sec_shadow->sec_number = sec->sec_number;
+    sec_shadow->sec_prev = sec_shadow->sec_next = NULL;
+    sec_shadow->sec_mergeto = sec->sec_mergeto;
+    sec_shadow->sec_datasize = sec->sec_datasize;
+    sec_shadow->sec_data = malloc(sec->sec_datasize);
+    memcpy(sec_shadow->sec_data, sec->sec_data, sec->sec_datasize);
+    sec_shadow->sec_delta = sec->sec_delta;
+    sec_shadow->sec_address = sec->sec_address;
+    sec_shadow->sec_name = malloc(strlen(sec->sec_name) + 1);
+    strcpy(sec_shadow->sec_name, sec->sec_name);
+    sec_shadow->sec_type = sec->sec_type;
+    sec_shadow->sec_flags = sec->sec_flags;
+    sec_shadow->sec_link = sec->sec_link;
+    sec_shadow->sec_info = sec->sec_info;
+    sec_shadow->sec_align = sec->sec_align;
+    sec_shadow->sec_entsize = sec->sec_entsize;
+    sec_shadow->sec_name_offset = sec->sec_name_offset;
+    sec_shadow->sec_file_offset = sec->sec_file_offset;
+    sec_shadow->sec_misc = sec->sec_misc;
+    
+    return sec_shadow;
+}

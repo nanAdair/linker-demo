@@ -82,7 +82,7 @@ void FillElfData(Elf32_File *elf_file, UINT8 *file_data)
             elf_file->elf_file_type = BINARY_SHARED_TYPE;
             break;
         default:
-            printf("The file type we can't handle\n");
+            printf("error The file type we can't handle\n");
             exit(EXIT_FAILURE);
     }
     
