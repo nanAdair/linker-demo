@@ -130,12 +130,15 @@ void InsertSymbolAfterSymbol(Symbol *new_symbol, Symbol *symbol)
 
 // sym_target: symbols in object file
 // sym_source: symbols in .so file
-Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
+Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source, Relocation *rel_list)
 {
     Symbol *cur_symbol, *last_symbol, *first_symbol;
     cur_symbol = last_symbol = first_symbol = NULL;
     
     MarkDynSymbol(sym_target, sym_source);
+    UpdateGOTForRelocations(rel_list, sym_target);
+    UpdatePLTForRelocations(rel_list, sym_target);
+    
     
     int i = 0;
     while (sym_target) {
@@ -164,6 +167,22 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source)
     return first_symbol;
 }
 
+Symbol *GetSymbolByIndex(Symbol *sym_list, UINT32 id)
+{
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    
+    while (cur_sym) {
+        if (cur_sym->sym_id == id)
+            return cur_sym;
+
+        cur_sym = cur_sym->sym_next;
+    }
+    
+    printf("error in finding the %dth symbol\n", id);
+    exit(EXIT_FAILURE);
+}
+
 // 动态符号有三种：GOT，PLT，导出符号
 static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
 {
@@ -177,19 +196,24 @@ static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
         while (cur_target != NULL) {
             if (!strcmp(cur_source->sym_name, cur_target->sym_name) && (cur_target->sym_sd_type == SYM_LOCAL)) {
                 
-                if ((cur_source->sym_content->st_info & 0xf) == STT_FUNC) {
+                if (cur_target->sym_content->st_shndx != SHN_UNDEF) {
+                    cur_target->sym_sd_type = SYM_OUT;
+                    cur_target->sym_version = 1;
+                    cur_target->sym_version_name = NULL;
+                }
+                else if ((cur_source->sym_content->st_info & 0xf) == STT_FUNC) {
                     cur_target->sym_sd_type = SYM_PLT;
                     cur_target->sym_content->st_info = (cur_target->sym_content->st_info & 0xfffffff0) + STT_FUNC;
                     cur_target->sym_version = cur_source->sym_version;
                     cur_target->sym_version_name = (UINT8 *)malloc(strlen(cur_source->sym_version_name) + 1);
                     strcpy(cur_target->sym_version_name, cur_source->sym_version_name);
                 }
-                else if (cur_source->sym_content->st_shndx == SHN_UNDEF) {
-                    cur_target->sym_sd_type = SYM_OUT;
-                    if (cur_target->sym_content->st_shndx != SHN_UNDEF)
-                        cur_target->sym_version = 1;
-                    cur_target->sym_version_name = NULL;
-                }
+                /*else if (cur_source->sym_content->st_shndx == SHN_UNDEF) {*/
+                    /*cur_target->sym_sd_type = SYM_OUT;*/
+                    /*if (cur_target->sym_content->st_shndx != SHN_UNDEF)*/
+                        /*cur_target->sym_version = 1;*/
+                    /*cur_target->sym_version_name = NULL;*/
+                /*}*/
                 else {
                     cur_target->sym_sd_type = SYM_GOT;
                     cur_target->sym_version = cur_source->sym_version;
@@ -199,6 +223,9 @@ static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
                         strcpy(cur_target->sym_version_name, cur_source->sym_version_name);
                     }
                 }
+                /*Trick: Tick out the first NULL symbol*/
+                if (cur_target->sym_id == 0)
+                    cur_target->sym_sd_type = SYM_OUT;
                 
                 /*cur_symbol = CopySymbolData(cur_target);*/
                 
@@ -265,11 +292,11 @@ static void showSymbolInfo(Symbol *symbol)
         /*printf("\n");*/
         /*printf("%d: ", cur_symbol->sym_binding);*/
         /*printf("%d  ", cur_symbol->sym_shndx);*/
-        if (cur_symbol->sym_sd_type == SYM_GOT) {
+        if (cur_symbol->sym_sd_type & SYM_GOT) {
             printf("%d GOT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);
             printf("\n");
         }
-        if (cur_symbol->sym_sd_type == SYM_PLT) {
+        if (cur_symbol->sym_sd_type & SYM_PLT) {
             printf("%d PLT %s %d %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);
             printf("\n");
         }

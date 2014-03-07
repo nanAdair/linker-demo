@@ -24,13 +24,14 @@
 #include "type.h"
 #include "file.h"
 #include "section.h"
+#include "relocation.h"
 #include "version.h"
 
 typedef enum {
     SYM_LOCAL,
     SYM_GOT,
     SYM_PLT,
-    SYM_OUT
+    SYM_OUT = 4
 } SYM_SD_TYPE;
 
 typedef struct Symbol {
@@ -46,8 +47,10 @@ typedef struct Symbol {
 
 // function declaration
 struct Section;
+struct Relocation;
 Symbol *GetSymbols(Elf32_File *, struct Section *);
 void InsertSymbolAfterSymbol(Symbol *, Symbol *);
-Symbol *MakeDynSymbol(Symbol *, Symbol *);
+Symbol *MakeDynSymbol(Symbol *, Symbol *, struct Relocation *);
+Symbol *GetSymbolByIndex(Symbol *, UINT32);
 
 #endif

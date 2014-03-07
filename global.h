@@ -28,5 +28,6 @@
 #include "version.h"
 #include "utils.h"
 #include "symbol.h"
+#include "relocation.h"
 
 #endif

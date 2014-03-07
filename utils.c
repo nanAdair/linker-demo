@@ -100,13 +100,16 @@ Section *SortSectionsByWriteOrder(Section *sec_list)
     int i, j, low, number_sections;
     number_sections = 0;
     
-    Section *cur_sec, *first_sec, *init, *res_list;
+    Section *cur_sec, *first_sec, *init, *res_list, *next_sec;
     cur_sec = first_sec = sec_list;
     init = GetSectionByName(sec_list, INIT_SECTION_NAME);
     
     while (cur_sec) {
+        printf("%s %d\n", cur_sec->sec_name, cur_sec->sec_misc);
         if ((cur_sec->sec_misc != 0) && (cur_sec->sec_type == SHT_REL)) {
-            cur_sec = cur_sec->sec_next;
+            next_sec = cur_sec->sec_next;
+            DropSection(cur_sec);
+            cur_sec = next_sec;
             continue;
         }
         
@@ -127,10 +130,10 @@ Section *SortSectionsByWriteOrder(Section *sec_list)
     number_sections = 0;
     
     while (cur_sec) {
-        if ((cur_sec->sec_misc != 0) && cur_sec->sec_type == SHT_REL) {
-            cur_sec = cur_sec->sec_next;
-            continue;
-        }
+        /*if ((cur_sec->sec_misc != 0) && cur_sec->sec_type == SHT_REL) {*/
+            /*cur_sec = cur_sec->sec_next;*/
+            /*continue;*/
+        /*}*/
         
         list[number_sections++] = cur_sec;
         cur_sec = cur_sec->sec_next;

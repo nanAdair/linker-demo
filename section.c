@@ -536,7 +536,7 @@ void UpdatePLTRelatedSections(Section *sec_list, Symbol *sym_list)
     int plt_number = 0;
     
     while (cur_sym) {
-        if (cur_sym->sym_sd_type == SYM_PLT) {
+        if (cur_sym->sym_sd_type & SYM_PLT) {
             AddPLTEntry(plt, plt_number);
             AddRelPLTEntry(relplt, cur_sym, plt_number);
             AddGOTorGOTPLTEntry(gotplt);
@@ -558,7 +558,7 @@ void UpdateGOTRelatedSections(Section *sec_list, Symbol *sym_list)
     int got_number = 0;
     
     while (cur_sym) {
-        if (cur_sym->sym_sd_type == SYM_GOT) {
+        if (cur_sym->sym_sd_type & SYM_GOT) {
             AddGOTorGOTPLTEntry(got);
             AddRelGOTEntry(reldyn, cur_sym, got_number);
             got_number += 1;
@@ -854,4 +854,20 @@ static Section *CopySection(Section *sec)
     sec_shadow->sec_misc = sec->sec_misc;
     
     return sec_shadow;
+}
+
+void DropSection(Section *sec)
+{
+    Section *head, *tail;
+    tail = NULL;
+    head = sec->sec_prev;
+    if (sec->sec_next)
+        tail = sec->sec_next;
+    head->sec_next = tail;
+    if (tail)
+        tail->sec_prev = head;
+    
+    free(sec->sec_data);
+    free(sec->sec_name);
+    free(sec);
 }

@@ -44,6 +44,9 @@ typedef struct Elf32_File {
     UINT8 *elf_dyn_sym_strn_table;
     Elf32_Sym *elf_dyn_sym_table;
     
+    int *rel_index;
+    int rel_num;
+    
     UINT8 *elf_file_data;
     UINT32 elf_file_size;
     BINARY_TYPE elf_file_type;

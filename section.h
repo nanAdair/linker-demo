@@ -90,5 +90,14 @@ void UpdatePLTRelatedSections(Section *, struct Symbol *);
 void UpdateGOTRelatedSections(Section *, struct Symbol *);
 void UpdateDynamicSection(Section *, int);
 
+//void AddDynstrEntryFromName(Section *, struct Symbol *);
+//void AddDynsymEntry(Section *, struct Symbol *);
+//void AddPLTEntry(Section *, int);
+//void AddGOTorGOTPLTEntry(Section *);
+//void AddRelPLTEntry(Section *, struct Symbol *, int);
+//void AddRelGOTEntry(Section *, struct Symbol *, int);
+//int FindOffset(Section *, char *);
+
 Section *MergeSection(Section *);
+void DropSection(Section *);
 #endif

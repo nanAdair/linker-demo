@@ -64,12 +64,15 @@ int main(int argc, char *argv[])
     Section *so_sec_list;
     so_sec_list = GetSections(so_file);
     
+    Relocation *rel_list;
+    rel_list = getRel(obj_file);
+    
     Symbol *sym_list, *so_sym_list, *dyn_sym_list;
     
     sym_list = GetSymbols(obj_file, sec_list);
     so_sym_list = GetSymbols(so_file, so_sec_list);
     
-    dyn_sym_list = MakeDynSymbol(sym_list, so_sym_list);
+    dyn_sym_list = MakeDynSymbol(sym_list, so_sym_list, rel_list);
     
     /*showSection(sec_list);*/
     CreateSections(sec_list);
@@ -95,6 +98,7 @@ int main(int argc, char *argv[])
     //.dynamic
     UpdateDynamicSection(sec_list, 1);
     
+    showSection(sec_list);
     sec_list = SortSectionsByWriteOrder(sec_list);
     AllocateAddress(sec_list);
     
@@ -109,9 +113,8 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
     /*showSectionData(test);*/
-    /*showSection(sec_list);*/
-    printf("\n");
-    showSection(merge_list);
+    showSection(sec_list);
+    /*showSection(merge_list);*/
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
@@ -135,7 +138,7 @@ void showSection(Section *section)
     
     while (cur_section != NULL) {
         printf("%d %s %x %x %x \n", cur_section->sec_number, cur_section->sec_name, cur_section->sec_datasize, cur_section->sec_address, cur_section->sec_file_offset);
-        printf("%x\n", cur_section->sec_delta);
+        /*printf("%x\n", cur_section->sec_delta);*/
         /*printf("%d %s\n", cur_section->sec_number, cur_section->sec_name);*/
         cur_section = cur_section->sec_next;
         i++;

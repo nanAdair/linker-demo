@@ -88,6 +88,7 @@ void FillElfData(Elf32_File *elf_file, UINT8 *file_data)
     
     int numberOfSections, i;
     INT16 shstrndx;
+    elf_file->rel_num = 0;
     
     numberOfSections = elf_file->elf_file_header->e_shnum;
     elf_file->elf_section_table = (Elf32_Shdr *)(file_data + elf_file->elf_file_header->e_shoff);
@@ -111,5 +112,21 @@ void FillElfData(Elf32_File *elf_file, UINT8 *file_data)
             elf_file->elf_dyn_sym_strn_table
                 = file_data + (elf_file->elf_section_table + elf_file->elf_dyn_sym_table_dr->sh_link)->sh_offset;
         }
+        
+	    if (cur_section->sh_type == SHT_REL)
+	        elf_file->rel_num++;
     }
+    
+    elf_file->rel_index = (int *)malloc(elf_file->rel_num * sizeof(int));
+    int j = 0;
+    for (i = 0; i < numberOfSections; i++) {
+	    Elf32_Shdr *cur_section;
+	    cur_section = elf_file->elf_section_table + i;
+	    if (cur_section->sh_type == SHT_REL)
+	        elf_file->rel_index[j++] = i;
+    }
+    /*printf("%d\n", j);*/
+        /*for (i = 0; i < j; i++)*/
+            /*printf("%d\n", elf_file->rel_index[i]);*/
+        
 }
