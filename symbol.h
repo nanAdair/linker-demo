@@ -27,6 +27,10 @@
 #include "relocation.h"
 #include "version.h"
 
+#define INIT_ARRAY_START "__init_array_start"
+#define INIT_ARRAY_END   "__init_array_end"
+
+#define GOT_SYMBOL_NAME  "_GLOBAL_OFFSET_TABLE_"
 typedef enum {
     SYM_LOCAL,
     SYM_GOT,
@@ -52,5 +56,7 @@ Symbol *GetSymbols(Elf32_File *, struct Section *);
 void InsertSymbolAfterSymbol(Symbol *, Symbol *);
 Symbol *MakeDynSymbol(Symbol *, Symbol *, struct Relocation *);
 Symbol *GetSymbolByIndex(Symbol *, UINT32);
+void UpdateBSSForSymbols(Symbol *, struct Section *);
+void UpdateSymbolValue(Symbol *, struct Section *, struct Section *);
 
 #endif

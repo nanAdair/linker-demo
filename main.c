@@ -98,9 +98,13 @@ int main(int argc, char *argv[])
     //.dynamic
     UpdateDynamicSection(sec_list, 1);
     
-    showSection(sec_list);
+    UpdateBSSForSymbols(sym_list, sec_list);
+    
+    /*showSection(sec_list);*/
     sec_list = SortSectionsByWriteOrder(sec_list);
     AllocateAddress(sec_list);
+    
+    UpdateSymbolValue(sym_list, sec_list, merge_list);
     
     /*showSection(sec_list);*/
     /*Section *test;*/

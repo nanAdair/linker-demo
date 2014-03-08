@@ -45,6 +45,8 @@
 #define INIT_ARRAY_SECTION_NAME ".init_array"
 #define FINI_ARRAY_SECTION_NAME ".fini_array"
 
+#define BSS_SECTION_NAME        ".bss"
+
 #define DYNAMIC_NUMBER 28
 #define DYNAMIC_ENTSIZE 8
 
@@ -62,8 +64,7 @@ typedef struct Section {
     UINT32 sec_address;
     UINT32 sec_newaddress;
     UINT8 *sec_name;
-    UINT32 sec_type;
-    UINT32 sec_flags;
+    UINT32 sec_type; UINT32 sec_flags;
     UINT32 sec_link;
     UINT32 sec_info;
     UINT32 sec_align;
@@ -76,6 +77,7 @@ typedef struct Section {
 struct Symbol;
 // function declaration
 Section *GetSections(Elf32_File *);
+Section *GetSectionByIndex(Section *, UINT32);
 Section *GetSectionByName(Section *, UINT8 *);
 void InsertSectionAfterSection(Section *, Section *);
 void CreateSections(Section *);

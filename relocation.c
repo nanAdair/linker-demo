@@ -31,13 +31,13 @@ Relocation* getRel(Elf32_File *elf_file){
 	}
     }
     cur = first;
-    while (cur){
-	printf("%s %s %s\n", int2str(&cur->offset, sizeof(INT32), 1, 0),
-	       int2str(&cur->index, sizeof(INT32), 1, 0),
-	       int2str(&cur->type, sizeof(INT8), 1, 0));
-	cur = cur->rel_next;
-    }
-    printf("%s\n", "this is the end");
+    /*while (cur){*/
+	/*printf("%s %s %s\n", int2str(&cur->offset, sizeof(INT32), 1, 0),*/
+		   /*int2str(&cur->index, sizeof(INT32), 1, 0),*/
+		   /*int2str(&cur->type, sizeof(INT8), 1, 0));*/
+	/*cur = cur->rel_next;*/
+    /*}*/
+    /*printf("%s\n", "this is the end");*/
     return first;
 }
 
@@ -124,3 +124,71 @@ void UpdatePLTForRelocations(Relocation *rel_list, Symbol *sym_list)
         cur_rel = cur_rel->rel_next;
     }
 }
+
+void ApplyRelocations(Relocation *rel_list, Section *sec_list, Section *merge_list, Symbol *sym_list, Symbol *dynsym_list)
+{
+    Relocation *cur_rel;
+    cur_rel = rel_list;
+    UINT8 rel_type;
+    UINT32 rel_offset, sym_index, sec_index, rel_value;
+    
+    while (cur_rel) {
+        rel_type = cur_rel->type;
+        rel_offset = cur_rel->offset;
+        sym_index = cur_rel->index;
+        sec_index = cur_rel->info;
+        
+        Symbol *symbol;
+        Section *temp, *section;
+        
+        symbol = GetSymbolByIndex(sym_list, sym_index);
+        temp = GetSectionByIndex(sec_list, sec_index);
+        if (temp) {
+            section = temp;
+        }
+        else {
+            temp = GetSectionByIndex(merge_list, sec_index);
+            section = temp->sec_mergeto;
+            rel_offset += temp->sec_delta;
+            
+            /* modify the content of relocations in merged section, useful when
+             * writing obfuscation codes */
+            cur_rel->offset = rel_offset;
+            cur_rel->info = section->sec_number;
+        }
+        
+        switch (rel_type) {
+            case R_386_NONE:
+                break;
+            case R_386_32:
+                /*ApplyRelocation_32(rel_offset, symbol, section);*/
+                break;
+            case R_386_PC32:
+                /*ApplyRelocation_PC32(rel_offset, symbol, section);*/
+                break;
+            case R_386_GOTPC:
+                /*ApplyRelocation_GOTPC(rel_offset, symbol, section);*/
+                break;
+            case R_386_GOTOFF:
+                /*ApplyRelocation_GOTOFF(rel_offset, symbol, section);*/
+                break;
+            case R_386_GOT32:
+                /*ApplyRelocation_GOT32(rel_offset, symbol, section);*/
+                break;
+            case R_386_PLT32:
+                /*ApplyRelocation_PLT32(rel_offset, symbol, section);*/
+                break;
+            default:
+                printf("error can't handle the relocation type\n");
+                exit(EXIT_FAILURE);
+                return ;
+        }
+
+        cur_rel = cur_rel->rel_next;
+    }
+}
+
+/*void ApplyRelocation_32(Relocation *rel, Symbol *symbol, Section *section)*/
+/*{*/
+
+/*}*/

@@ -163,7 +163,7 @@ Symbol *MakeDynSymbol(Symbol *sym_target, Symbol *sym_source, Relocation *rel_li
         sym_target = sym_target->sym_next;
     }
     
-    showSymbolInfo(first_symbol);
+    /*showSymbolInfo(first_symbol);*/
     return first_symbol;
 }
 
@@ -280,10 +280,10 @@ static void showSymbolInfo(Symbol *symbol)
     cur_symbol = symbol;
     int i = 0;
     while (cur_symbol != NULL) {
-        /*printf("%d ", i);*/
-        /*printf("%8x: ", cur_symbol->sym_value);*/
+        printf("%d ", cur_symbol->sym_id);
+        printf("%8x: ", cur_symbol->sym_content->st_value);
         /*printf("%5d: ", cur_symbol->sym_size);*/
-        /*printf("%s ", cur_symbol->sym_name);*/
+        printf("%s ", cur_symbol->sym_name);
         /*printf("%d\n", cur_symbol->sym_sd_type);*/
         /*printf("%d ", cur_symbol->sym_version);*/
         /*if (cur_symbol->sym_version_name == NULL)*/
@@ -292,20 +292,139 @@ static void showSymbolInfo(Symbol *symbol)
         /*printf("\n");*/
         /*printf("%d: ", cur_symbol->sym_binding);*/
         /*printf("%d  ", cur_symbol->sym_shndx);*/
-        if (cur_symbol->sym_sd_type & SYM_GOT) {
-            printf("%d GOT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);
-            printf("\n");
-        }
-        if (cur_symbol->sym_sd_type & SYM_PLT) {
-            printf("%d PLT %s %d %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);
-            printf("\n");
-        }
-        if (cur_symbol->sym_sd_type == SYM_OUT) {
-            printf("%d OUT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);
-            printf("\n");
-        }
+        /*if (cur_symbol->sym_sd_type & SYM_GOT) {*/
+            /*printf("%d GOT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);*/
+            /*printf("\n");*/
+        /*}*/
+        /*if (cur_symbol->sym_sd_type & SYM_PLT) {*/
+            /*printf("%d PLT %s %d %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version, cur_symbol->sym_version_name, cur_symbol->sym_content->st_info);*/
+            /*printf("\n");*/
+        /*}*/
+        /*if (cur_symbol->sym_sd_type == SYM_OUT) {*/
+            /*printf("%d OUT  %s %d", cur_symbol->sym_id, cur_symbol->sym_name, cur_symbol->sym_version);*/
+            /*printf("\n");*/
+        /*}*/
+        printf("\n");
         
         cur_symbol = cur_symbol->sym_next;
         i++;
     }
+}
+
+/* TODO: UNFIXED, Compare to determine the size of common symbol */
+void UpdateBSSForSymbols(Symbol *sym_list, Section *sec_list)
+{
+    Section *bss;
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    bss = GetSectionByName(sec_list, BSS_SECTION_NAME);
+    
+    
+    while (cur_sym) {
+        if (cur_sym->sym_content->st_shndx == SHN_COMMON) {
+            int sym_size;
+            sym_size = cur_sym->sym_content->st_size;
+            
+            int addition, datasize, newdatasize;
+            datasize = bss->sec_datasize;
+            addition = 0;
+            UINT32 align;
+            align = bss->sec_align;
+            align = sym_size > align ? sym_size : align;
+            while ((datasize + addition) % align != 0)
+                addition++;
+            newdatasize = datasize + addition + sym_size;
+            
+            bss->sec_datasize = newdatasize;
+            bss->sec_align = align;
+            cur_sym->sym_content->st_value = datasize + addition;
+            cur_sym->sym_content->st_shndx = bss->sec_number;
+        }
+
+        cur_sym = cur_sym->sym_next;
+    }
+}
+
+void UpdateSymbolValue(Symbol *sym_list, Section *sec_list, Section *merge_list)
+{
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    
+    while (cur_sym) {
+        UINT32 sym_type, sym_binding, sym_shndx, sym_value;
+        SYM_SD_TYPE sym_sd_type;
+        sym_type = cur_sym->sym_content->st_info & 0xf;
+        sym_binding = cur_sym->sym_content->st_info >> 0x4;
+        sym_shndx = cur_sym->sym_content->st_shndx;
+        sym_value = cur_sym->sym_content->st_value;
+        sym_sd_type = cur_sym->sym_sd_type;
+        
+        Section *sec;
+        
+        /* TYPE: SECTION Just find the address of the section */
+        if ((sym_type == STT_SECTION || sym_type == STT_OBJECT || sym_type == STT_FUNC) && (sym_sd_type == SYM_LOCAL || sym_sd_type == SYM_OUT)) {
+            Section *temp;
+            temp = GetSectionByIndex(sec_list, sym_shndx);
+            if (temp) {
+                sec = temp;
+                sym_value += sec->sec_address;
+            }
+            else {
+                temp = GetSectionByIndex(merge_list, sym_shndx);
+                sec = temp->sec_mergeto;
+                sym_value = sec->sec_address + temp->sec_delta + sym_value;
+            }
+        }
+        
+        /* TYPE: FILE Skip this kind */
+        else if (sym_type == STT_FILE) {
+            cur_sym = cur_sym->sym_next;
+            continue;
+        }
+        
+        /* TYPE: NOTYPE, BUT CAN BE FOUND IN A SECTION */
+        else if (sym_shndx != SHN_UNDEF) {
+            Section *temp;
+            temp = GetSectionByIndex(sec_list, sym_shndx);
+            if (temp) {
+                sec = temp;
+                sym_value += sec->sec_address;
+            }
+            else {
+                temp = GetSectionByIndex(merge_list, sym_shndx);
+                sec = temp->sec_mergeto;
+                sym_value = sec->sec_address + temp->sec_delta + sym_value;
+            }
+        }
+        
+        /* Special symbols resolved by hand */
+        else {
+            if (!strcmp(cur_sym->sym_name, INIT_ARRAY_START)) {
+                Section *init_array;
+                init_array = GetSectionByName(sec_list, INIT_ARRAY_SECTION_NAME);
+                sym_value = init_array->sec_address;
+                cur_sym->sym_content->st_shndx = init_array->sec_number;
+            }
+            
+            if (!strcmp(cur_sym->sym_name, INIT_ARRAY_END)) {
+                Section *init_array;
+                init_array = GetSectionByName(sec_list, INIT_ARRAY_SECTION_NAME);
+                sym_value = init_array->sec_address + init_array->sec_datasize;
+                cur_sym->sym_content->st_shndx = init_array->sec_number;
+            }
+            
+            if (!strcmp(cur_sym->sym_name, GOT_SYMBOL_NAME)) {
+                Section *got;
+                got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+                sym_value = got->sec_address;
+                cur_sym->sym_content->st_shndx = got->sec_number;
+            }
+            
+        }
+        
+        cur_sym->sym_content->st_value = sym_value;
+        cur_sym = cur_sym->sym_next;
+    }
+    
+    showSymbolInfo(sym_list);
 }

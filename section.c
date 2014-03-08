@@ -114,6 +114,24 @@ void InsertSectionAfterSection(Section *new_section, Section *section)
     }
 }
 
+Section *GetSectionByIndex(Section *sec_list, UINT32 sec_id)
+{
+    Section *cur_sec;
+    cur_sec = sec_list;
+    
+    while (cur_sec) {
+        if (cur_sec->sec_number == sec_id)
+            return cur_sec;
+
+        cur_sec = cur_sec->sec_next;
+    }
+    
+    /*printf("error in finding the %dth section\n", sec_id);*/
+    return NULL;
+    
+    /*exit(EXIT_FAILURE);*/
+}
+
 Section *GetSectionByName(Section *sec_list, UINT8 *sec_name)
 {
     Section *cur_section;

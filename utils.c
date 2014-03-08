@@ -105,7 +105,7 @@ Section *SortSectionsByWriteOrder(Section *sec_list)
     init = GetSectionByName(sec_list, INIT_SECTION_NAME);
     
     while (cur_sec) {
-        printf("%s %d\n", cur_sec->sec_name, cur_sec->sec_misc);
+        /*printf("%s %d\n", cur_sec->sec_name, cur_sec->sec_misc);*/
         if ((cur_sec->sec_misc != 0) && (cur_sec->sec_type == SHT_REL)) {
             next_sec = cur_sec->sec_next;
             DropSection(cur_sec);
