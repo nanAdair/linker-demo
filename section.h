@@ -48,6 +48,7 @@
 #define BSS_SECTION_NAME        ".bss"
 
 #define SHSTRTAB_SECTION_NAME   ".shstrtab"
+#define NOTE_SECTION_NAME       ".note.ABI-tag"
 
 #define DYNAMIC_NUMBER 28
 #define DYNAMIC_ENTSIZE 8
@@ -66,7 +67,8 @@ typedef struct Section {
     UINT32 sec_address;
     UINT32 sec_newaddress;
     UINT8 *sec_name;
-    UINT32 sec_type; UINT32 sec_flags;
+    UINT32 sec_type; 
+    UINT32 sec_flags;
     UINT32 sec_link;
     UINT32 sec_info;
     UINT32 sec_align;

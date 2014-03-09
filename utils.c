@@ -19,8 +19,14 @@
 #include <stdio.h>
 #include <string.h>
 #include "utils.h"
+#include "utilsGD.h"
 
 static void RoundUpSection(Section *, int);
+static void UpdateProgPHDR(Elf32_Phdr *phdr);
+static void UpdateProgINTERP(Elf32_Phdr *phdr, Section *sec_list);
+static void UpdateProgLOAD(Elf32_Phdr *phdr, Section *sec_list);
+static void UpdateProgDYNAMIC(Elf32_Phdr *phdr, Section *sec_list);
+static void UpdateProgNOTE(Elf32_Phdr *phdr, Section *sec_list);
 int GetDynDataByTag(Section *dynamic, int tag)
 {
     int i, number;
@@ -170,6 +176,7 @@ void AllocateAddress(Section *sec_list)
     UINT32 base_addr, offset;
     base_addr = 0x8048000;
     offset = 0x114;
+    UINT32 addend = 0;
     
     Section *cur_sec, *last_sec;
     cur_sec = sec_list;
@@ -187,8 +194,11 @@ void AllocateAddress(Section *sec_list)
         offset += addition;
         /*printf("%d %d %x\n", align, addition, offset);*/
         
+        // as for loading operation, there have to be one more page
+        if (cur_sec->sec_flags & SHF_WRITE)
+            addend = 0x1000;
         if (cur_sec->sec_flags & SHF_ALLOC)
-            cur_sec->sec_address = base_addr + offset;
+            cur_sec->sec_address = base_addr + offset + addend;
         else
             cur_sec->sec_address = 0;
         cur_sec->sec_file_offset = offset;
@@ -213,4 +223,282 @@ static void RoundUpSection(Section *sec, int add)
     
     free(sec->sec_data);
     sec->sec_data = buffer;
+}
+
+Section_Table *CreateSectionTable(Section *sec_list)
+{
+    Section_Table *sec_tab;
+    sec_tab = (Section_Table *)malloc(sizeof(Section_Table));
+    
+    Elf32_Shdr *cur_shdr;
+    UINT8 *buffer;
+    UINT32 buffer_size, addition, offset;
+    buffer = NULL;
+    buffer_size = 0;
+    addition = sizeof(Elf32_Shdr);
+    
+    Section *cur_sec, *last_sec;
+    cur_sec = sec_list;
+    int i = 0;
+    
+    while (cur_sec) {
+        cur_shdr = (Elf32_Shdr *)malloc(addition);
+        
+        cur_shdr->sh_name = cur_sec->sec_name_offset;
+        cur_shdr->sh_type = cur_sec->sec_type;
+        cur_shdr->sh_flags = cur_sec->sec_flags;
+        cur_shdr->sh_offset = cur_sec->sec_file_offset;
+        cur_shdr->sh_size = cur_sec->sec_datasize;
+        cur_shdr->sh_link = cur_sec->sec_link;
+        cur_shdr->sh_info = cur_sec->sec_info;
+        cur_shdr->sh_addralign = cur_sec->sec_align;
+        cur_shdr->sh_entsize = cur_sec->sec_entsize;
+        
+        if (buffer == NULL) {
+            buffer = (UINT8 *)malloc(addition);
+            memset(buffer, 0x0, addition);
+            memcpy(buffer, cur_shdr, addition);
+            buffer_size = addition;
+            free(cur_shdr);
+        }
+        else {
+            UINT8 *newbuffer;
+            newbuffer = (UINT8 *)malloc(buffer_size + addition);
+            memset(newbuffer, 0x0, buffer_size + addition);
+            memcpy(newbuffer, buffer, buffer_size);
+            memcpy(newbuffer + buffer_size, cur_shdr, addition);
+            
+            free(buffer);
+            buffer = newbuffer;
+            buffer_size += addition;
+            free(cur_shdr);
+        }
+        
+        if (!strcmp(cur_sec->sec_name, SHSTRTAB_SECTION_NAME))
+            sec_tab->str_index = cur_sec->sec_number;
+
+        i++;
+        last_sec = cur_sec;
+        cur_sec = cur_sec->sec_next;
+    }
+    
+    offset = last_sec->sec_file_offset + last_sec->sec_datasize;
+    
+    sec_tab->content = buffer;
+    sec_tab->offset = offset;
+    sec_tab->number = i;
+    
+    return sec_tab;
+}
+
+UINT8 *CreateProgramHeaderTable(Section *sec_list)
+{
+    // hard-coded here
+    int entsize = 0x20;
+    
+    UINT8 *buffer;
+    UINT32 buffer_size;
+    
+    buffer = NULL;
+    buffer_size = 0;
+    
+    int i, number, addition;
+    number = sizeof(Program_Headers) / entsize;
+    addition = sizeof(Elf32_Phdr);
+    
+    for (i = 0; i < number; i++) {
+        Elf32_Phdr program_header;
+        program_header = Program_Headers[i];
+        UINT32 type;
+        type = program_header.p_type;
+        
+        switch (type) {
+            case PT_PHDR:
+                UpdateProgPHDR(&program_header);
+                break;
+            case PT_INTERP:
+                UpdateProgINTERP(&program_header, sec_list);
+                break;
+            case PT_LOAD:
+                UpdateProgLOAD(&program_header, sec_list);
+                break;
+            case PT_DYNAMIC:
+                UpdateProgDYNAMIC(&program_header, sec_list);
+                break;
+            case PT_NOTE:
+                UpdateProgNOTE(&program_header, sec_list);
+                break;
+            case PT_GNU_STACK:
+                /*UpdateProgGNU_STACK(&program_header, sec_list);*/
+                break;
+            default:
+                printf("error in handling the phdr type %d\n", type);
+                break;
+        }
+        
+        if (buffer == NULL) {
+            buffer = malloc(addition);
+            memset(buffer, 0x0, addition);
+            memcpy(buffer, &program_header, addition);
+            buffer_size = addition;
+        }
+        else {
+            UINT8 *newbuffer;
+            newbuffer = malloc(buffer_size + addition);
+            memset(newbuffer, 0x0, addition);
+            memcpy(newbuffer, buffer, buffer_size);
+            memcpy(newbuffer + buffer_size, &program_header, addition);
+            
+            free(buffer);
+            buffer = newbuffer;
+            buffer_size += addition;
+        }
+    }
+    
+    return buffer;
+}
+
+static void UpdateProgPHDR(Elf32_Phdr *phdr)
+{
+    UINT32 offset, base_addr;
+    offset = sizeof(Elf32_Ehdr);
+    base_addr = 0x8048000;
+    
+    phdr->p_offset = offset;
+    phdr->p_vaddr = phdr->p_paddr = base_addr + offset;
+    phdr->p_memsz = phdr->p_filesz = sizeof(Program_Headers);
+}
+
+static void UpdateProgINTERP(Elf32_Phdr *phdr, Section *sec_list)
+{
+    Section *interp;
+    interp = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    
+    UINT32 offset, base_addr;
+    offset = interp->sec_file_offset;
+    base_addr = 0x8048000;
+    
+    phdr->p_offset = offset;
+    phdr->p_vaddr = phdr->p_paddr = base_addr + offset;
+    phdr->p_memsz = phdr->p_filesz = interp->sec_datasize;
+}
+
+static void UpdateProgLOAD(Elf32_Phdr *phdr, Section *sec_list)
+{
+    UINT32 offset, base_addr, filesize, memsize;
+    
+    if (phdr->p_flags & PF_X) {
+        offset = 0;
+        base_addr = 0x8048000;
+        UINT32 dataBegin, dataEnd;
+        dataBegin = 0;
+        
+        Section *cur_sec;
+        cur_sec = sec_list;
+        while (cur_sec) {
+            if (cur_sec->sec_flags & SHF_WRITE)
+                break;
+            
+            cur_sec = cur_sec->sec_next;
+        }
+        dataEnd = cur_sec->sec_file_offset;
+        
+        filesize = dataEnd - dataBegin;
+        memsize = filesize;
+    }
+    
+    if (phdr->p_flags & PF_W) {
+        UINT32 dataBegin, dataEnd;
+        Section *cur_sec;
+        cur_sec = sec_list;
+        while (cur_sec) {
+            if (cur_sec->sec_flags & SHF_WRITE)
+                break;
+            
+            cur_sec = cur_sec->sec_next;
+        }
+        offset = cur_sec->sec_file_offset;
+        base_addr = cur_sec->sec_address;
+        dataBegin = cur_sec->sec_file_offset;
+        
+        while (cur_sec) {
+            if (!(cur_sec->sec_next->sec_flags & SHF_WRITE))
+                break;
+            cur_sec = cur_sec->sec_next;
+        }
+        dataEnd = cur_sec->sec_file_offset;
+        filesize = dataEnd - dataBegin;
+        memsize = filesize + cur_sec->sec_datasize;
+    }
+    
+    phdr->p_offset = offset;
+    phdr->p_vaddr = phdr->p_paddr = base_addr;
+    phdr->p_filesz = filesize;
+    phdr->p_memsz = memsize;
+}
+
+static void UpdateProgDYNAMIC(Elf32_Phdr *phdr, Section *sec_list)
+{
+    Section *dynamic;
+    dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
+    
+    phdr->p_offset = dynamic->sec_file_offset;
+    phdr->p_vaddr = phdr->p_paddr = dynamic->sec_address;
+    phdr->p_filesz = phdr->p_memsz = dynamic->sec_datasize;
+}
+
+static void UpdateProgNOTE(Elf32_Phdr *phdr, Section *sec_list)
+{
+    Section *note;
+    note = GetSectionByName(sec_list, NOTE_SECTION_NAME);
+    
+    phdr->p_offset = note->sec_file_offset;
+    phdr->p_vaddr = phdr->p_paddr = note->sec_address;
+    phdr->p_filesz = phdr->p_memsz = note->sec_datasize;
+}
+
+/*static void UpdateProgGNU_STACK()*/
+
+Elf32_Ehdr *CreateElfHeader(Elf32_Ehdr *ehdr, Section *sec_list, Section_Table *sec_tab)
+{
+    Elf32_Ehdr *elf_file_header;
+    elf_file_header = (Elf32_Ehdr *)malloc(sizeof(Elf32_Ehdr));
+    memcpy(elf_file_header, ehdr, sizeof(Elf32_Ehdr));
+    
+    Section *text;
+    text = GetSectionByName(sec_list, TEXT_SECTION_NAME);
+    
+    elf_file_header->e_type = ET_EXEC;
+    elf_file_header->e_entry = text->sec_address;
+    elf_file_header->e_phoff = sizeof(Elf32_Ehdr);
+    elf_file_header->e_shoff = sec_tab->offset;
+    elf_file_header->e_phentsize = 0x20;
+    elf_file_header->e_phnum = 7;
+    elf_file_header->e_shnum = sec_tab->number;
+    elf_file_header->e_shstrndx = sec_tab->str_index;
+    
+    return elf_file_header;
+}
+
+void WriteOut(Elf32_Ehdr *ehdr_data, UINT8 *phdr_data, Section *sec_list, Section_Table *sec_tab)
+{
+    FILE *output;
+    output = fopen("output", "wb");
+    UINT32 phdr_size, sec_tab_size;
+    phdr_size = ehdr_data->e_phentsize * ehdr_data->e_phnum;
+    sec_tab_size = ehdr_data->e_shentsize * ehdr_data->e_shnum;
+    
+    fwrite(ehdr_data, sizeof(Elf32_Ehdr), 1, output);
+    fwrite(phdr_data, phdr_size, 1, output);
+    
+    Section *cur_sec;
+    cur_sec = sec_list;
+    while (cur_sec) {
+        fwrite(cur_sec->sec_data, cur_sec->sec_datasize, 1, output);
+        cur_sec = cur_sec->sec_next;
+    }
+    
+    fwrite(sec_tab->content, sec_tab_size, 1, output);
+    
+    fclose(output);
 }

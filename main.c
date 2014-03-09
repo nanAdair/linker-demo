@@ -24,7 +24,7 @@
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections);
 void showSection(Section *section);
-void showSectionData(Section *);
+void showSectionData(FILE *, Section *);
 int main(int argc, char *argv[])
 {
     char obj_filename[100], so_filename[100], ld_filename[100], temp_filename[100];
@@ -118,10 +118,21 @@ int main(int argc, char *argv[])
     RenewSectionInfo(sec_list);
     RenewDynamicSection(sec_list);
     
+    Section_Table *sec_tab;
+    sec_tab = CreateSectionTable(sec_list);
+    UINT8 *phdr_data;
+    phdr_data = CreateProgramHeaderTable(sec_list);
+    
+    Elf32_Ehdr *elf_header;
+    elf_header = CreateElfHeader(obj_file->elf_file_header, sec_list, sec_tab);
+    
+    WriteOut(elf_header, phdr_data, sec_list, sec_tab);
+    /*printf("section table offset: %d\n", sec_tab->offset);*/
+    
     /*showSection(sec_list);*/
-    Section *test;
-    /*test = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
-    /*test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
+    /*Section *test1, *test2;*/
+    /*test1 = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
+    /*test2 = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, GV_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, GNR_SECTION_NAME);*/
@@ -131,10 +142,16 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, TEXT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, INIT_SECTION_NAME);*/
-    test = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
-    showSectionData(test);
-    showSection(sec_list);
+    /*test = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);*/
+    /*showSectionData(test);*/
+    /*showSection(sec_list);*/
     /*showSection(merge_list);*/
+    
+    /*FILE *output;*/
+    /*output = fopen("output", "wb");*/
+    /*showSectionData(output, test1);*/
+    /*showSectionData(output, test2);*/
+    /*fclose(output);*/
 }
 
 void showSectionInfo(Elf32_Shdr *elf_section_table, int numberOfSections)
@@ -165,13 +182,10 @@ void showSection(Section *section)
     }
 }
 
-void showSectionData(Section *sec)
+void showSectionData(FILE *output, Section *sec)
 {
-    FILE *output;
-    output = fopen("output", "wb");
     
     fwrite(sec->sec_data, sec->sec_datasize, 1, output);
     
-    fclose(output);
 }
 
