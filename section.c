@@ -33,6 +33,7 @@ static void FillHashSection(Section *, Symbol *);
 static void FillGNRSection(Section *, Symbol *, Section *, char *);
 static void AddDynstrEntryFromName(Section *, Symbol *);
 static void AddDynstrEntryFromVersion(Section *, Symbol *);
+static void AddShstrEntry(Section *, Section *);
 static void AddDynsymEntry(Section *, Symbol *);
 static void AddGVEntry(Section *, Symbol *);
 static void AddGNREntry(Section *, Symbol *, Section *, int);
@@ -197,6 +198,41 @@ static void FillInterpSection(Section *interp_sec, char *ld_path)
     interp_sec->sec_data = (UINT8 *)malloc(length + 1);
     interp_sec->sec_datasize = interp_sec->sec_newdatasize = length + 1;
     strcpy(interp_sec->sec_data, ld_path);
+}
+
+void UpdateShstrSection(Section *sec_list)
+{
+    Section *shstrtab, *cur_sec;
+    shstrtab = GetSectionByName(sec_list, SHSTRTAB_SECTION_NAME);
+    
+    free(shstrtab->sec_data);
+    shstrtab->sec_data = NULL;
+    shstrtab->sec_datasize = 0;
+    cur_sec = sec_list;
+    
+    while (cur_sec) {
+        AddShstrEntry(shstrtab, cur_sec);
+        cur_sec = cur_sec->sec_next;
+    }
+}
+
+static void AddShstrEntry(Section *shstrtab, Section *section)
+{
+    int datasize, newdatasize, length;
+    datasize = shstrtab->sec_datasize;
+    length = strlen(section->sec_name) + 1;
+    newdatasize = datasize + length;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(newdatasize);
+    memcpy(buffer, shstrtab->sec_data, datasize);
+    strcpy(buffer + datasize, section->sec_name);
+    
+    if (shstrtab != NULL)
+        free(shstrtab->sec_data);
+    shstrtab->sec_data = buffer;
+    shstrtab->sec_datasize = newdatasize;
+    section->sec_name_offset = datasize;
 }
 
 void UpdateDynstrSection(Section *sec_list, Symbol *dynsym_list, char *so_filename)
@@ -888,4 +924,270 @@ void DropSection(Section *sec)
     free(sec->sec_data);
     free(sec->sec_name);
     free(sec);
+}
+
+void RenewRelGOTSection(Section *sec_list)
+{
+    Section *relgot, *got;
+    relgot = GetSectionByName(sec_list, REL_DYN_SECTION_NAME);
+    got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+    
+    UINT32 got_sec_address;
+    got_sec_address = got->sec_address;
+    
+    int i, number;
+    number = relgot->sec_datasize / relgot->sec_entsize;
+    
+    for (i = 0; i < number; i++) {
+        Elf32_Rel *cur_rel;
+        cur_rel = (Elf32_Rel *)(relgot->sec_data + relgot->sec_entsize * i);
+        cur_rel->r_offset += got_sec_address;
+    }
+}
+
+void RenewRelPLTSection(Section *sec_list)
+{
+    Section *relplt, *gotplt;
+    relplt = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    
+    UINT32 gotplt_sec_address;
+    gotplt_sec_address = gotplt->sec_address;
+    // There are three item before
+    gotplt_sec_address += 0xc;
+    
+    int i, number;
+    number = relplt->sec_datasize / relplt->sec_entsize;
+    
+    for (i = 0; i < number; i++) {
+        Elf32_Rel *cur_rel;
+        cur_rel = (Elf32_Rel *)(relplt->sec_data + relplt->sec_entsize * i);
+        cur_rel->r_offset += gotplt_sec_address;
+    }
+}
+
+void RenewPLTSection(Section *sec_list)
+{
+    Section *plt, *gotplt;
+    plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    
+    int i, number;
+    /* plt ent_size is 0x4 */
+    number = plt->sec_datasize / 0x10;
+    
+    UINT32 plt_sec_address, gotplt_sec_address;
+    plt_sec_address = plt->sec_address;
+    gotplt_sec_address = gotplt->sec_address;
+    
+    UINT32 value1, value2;
+    value1 = gotplt_sec_address + 4;
+    value2 = gotplt_sec_address + 8;
+    
+    /* PLT0 */
+    memcpy(plt->sec_data + 2, &value1, sizeof(UINT32));
+    memcpy(plt->sec_data + 8, &value2, sizeof(UINT32));
+
+    for (i = 1; i < number; i++) {
+         /*PLTi*/
+        UINT8 *data;
+        data = plt->sec_data + i * 0x10;
+        
+        UINT32 d_address;
+        d_address = gotplt_sec_address + 0xc + (i - 1) * 4;
+        
+        memcpy(data + 2, &d_address, sizeof(UINT32));
+        
+        int value;
+        UINT32 e_address;
+         /*address of PLT i+1 */
+        e_address = plt_sec_address + 0x10 * (i + 1);
+        value = plt_sec_address - e_address;
+        
+        memcpy(data + 0xc, &value, sizeof(int));
+    }
+}
+
+void RenewGOTPLTSection(Section *sec_list)
+{
+    Section *dynamic, *gotplt, *plt;
+    
+    dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+    
+    int i, number;
+    number = gotplt->sec_datasize / 0x4;
+    
+    UINT32 dynamic_address, plt_address;
+    dynamic_address = dynamic->sec_address;
+    plt_address = plt->sec_address;
+    
+    memcpy(gotplt->sec_data, &dynamic_address, sizeof(UINT32));
+    
+    /* Item 2, 3 are leaved empty
+     * TODO: UNFIEXED Maybe a bug here*/
+    
+    for (i = 3; i < number; i++) {
+        UINT8 *data;
+        data = gotplt->sec_data + i * 0x4;
+        
+        UINT32 address;
+        address = plt_address + (i - 3 + 1) * 0x10 + 6;
+        
+        memcpy(data, &address, sizeof(UINT32));
+    }
+}
+
+void RenewDynamicSection(Section *sec_list)
+{
+    Section *dynamic, *gotplt, *plt, *got, *dynsym, *dynstr, *relgot, *relplt, *hash;
+    Section *init, *fini, *fini_array, *init_array, *gv, *gnr;
+    dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+    got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+    dynsym = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);
+    relgot = GetSectionByName(sec_list, REL_DYN_SECTION_NAME);
+    relplt = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);
+    dynstr = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);
+    hash = GetSectionByName(sec_list, HASH_SECTION_NAME);
+    init = GetSectionByName(sec_list, INIT_SECTION_NAME);
+    fini = GetSectionByName(sec_list, FINI_SECTION_NAME);
+    fini_array = GetSectionByName(sec_list, FINI_ARRAY_SECTION_NAME);
+    init_array = GetSectionByName(sec_list, INIT_ARRAY_SECTION_NAME);
+    gv = GetSectionByName(sec_list, GV_SECTION_NAME);
+    gnr = GetSectionByName(sec_list, GNR_SECTION_NAME);
+    
+    int i, number;
+    number = sizeof(DynamicSectionInfo) / sizeof(Elf32_Dyn);
+    printf("%d\n", number);
+    
+    for (i = 0; i < number; i++) {
+        Elf32_Dyn *dyn_item;
+        dyn_item = (Elf32_Dyn *)(dynamic->sec_data + i * sizeof(Elf32_Dyn));
+        
+        INT32 tag;
+        tag = DynamicSectionInfo[i].d_tag;
+        dyn_item->d_tag = tag;
+        
+        switch(tag) {
+            case DT_PLTGOT:
+                dyn_item->d_un.d_ptr = gotplt->sec_address;
+                break;
+            case DT_PLTRELSZ:
+                dyn_item->d_un.d_val = relplt->sec_datasize;
+                break;
+            case DT_JMPREL:
+                dyn_item->d_un.d_ptr = relplt->sec_address;
+                break;
+            case DT_PLTREL:
+                // UNFIEXED: REL IS NOT 0x11
+                dyn_item->d_un.d_val = 0x11;
+                break;
+            case DT_REL:
+                dyn_item->d_un.d_ptr = relgot->sec_address;
+                break;
+            case DT_RELSZ:
+                dyn_item->d_un.d_val = relgot->sec_datasize;
+                break;
+            case DT_RELENT:
+                // seems to be a fixed value;
+                dyn_item->d_un.d_val = relgot->sec_entsize;
+                break;
+            case DT_DEBUG:
+                dyn_item->d_un.d_ptr = 0x0;
+                break;
+            case DT_SYMTAB:
+                dyn_item->d_un.d_ptr = dynsym->sec_address;
+                break;
+            case DT_SYMENT:
+                dyn_item->d_un.d_val = dynsym->sec_entsize;
+                break;
+            case DT_STRTAB:
+                dyn_item->d_un.d_ptr = dynstr->sec_address;
+                break;
+            case DT_STRSZ:
+                dyn_item->d_un.d_val = dynstr->sec_datasize;
+                break;
+            case DT_HASH:
+                dyn_item->d_un.d_ptr = hash->sec_address;
+                break;
+            case DT_NEEDED:
+                // TODO: UNFIEXED: hard-code here
+                dyn_item->d_un.d_val = FindOffset(dynstr, "/usr/lib/libc.so.6");
+                break;
+            case DT_INIT:
+                dyn_item->d_un.d_ptr = init->sec_address;
+                break;
+            case DT_FINI:
+                dyn_item->d_un.d_ptr = fini->sec_address;
+                break;
+            case DT_FINI_ARRAY:
+                dyn_item->d_un.d_ptr = fini_array->sec_address;
+                break;
+            case DT_FINI_ARRAYSZ:
+                dyn_item->d_un.d_val = fini_array->sec_datasize;
+                break;
+            case DT_INIT_ARRAY:
+                dyn_item->d_un.d_ptr = init_array->sec_address;
+                break;
+            case DT_INIT_ARRAYSZ:
+                dyn_item->d_un.d_val = init_array->sec_datasize;
+                break;
+            case DT_VERSYM:
+                dyn_item->d_un.d_ptr = gv->sec_address;
+                break;
+            case DT_VERNEED:
+                dyn_item->d_un.d_ptr = gnr->sec_address;
+                break;
+            case DT_VERNEEDNUM:
+                // TODO: UNFIEXED: hard-code here
+                dyn_item->d_un.d_val = 0x1;
+                break;
+            case DT_NULL:
+                dyn_item->d_un.d_val = 0x0;
+                break;
+            default:
+                printf("error in finding dynamic section item\n");
+                break;
+        }
+    }
+}
+
+void RenewSectionInfo(Section *sec_list)
+{
+    Section *cur_sec;
+    cur_sec = sec_list;
+    int id = 0;
+    
+    while (cur_sec) {
+        cur_sec->sec_number = id;
+        id++;
+        cur_sec = cur_sec->sec_next;
+    }
+    
+    cur_sec = sec_list;
+    
+    Section *dynamic, *plt, *dynsym, *dynstr, *relgot, *relplt, *hash, *got, *gotplt;
+    Section *gv, *gnr, *interp;
+    dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
+    plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+    dynsym = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);
+    relgot = GetSectionByName(sec_list, REL_DYN_SECTION_NAME);
+    relplt = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);
+    got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    dynstr = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);
+    hash = GetSectionByName(sec_list, HASH_SECTION_NAME);
+    gv = GetSectionByName(sec_list, GV_SECTION_NAME);
+    gnr = GetSectionByName(sec_list, GNR_SECTION_NAME);
+    interp = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    
+    gnr->sec_info = dynsym->sec_info = interp->sec_number;
+    relplt->sec_info = gotplt->sec_number;
+    relgot->sec_info = got->sec_number;
+    
+    hash->sec_link = gv->sec_link = relgot->sec_link = relplt->sec_link = dynsym->sec_number;
+    gnr->sec_link = dynsym->sec_link = dynstr->sec_number;
 }

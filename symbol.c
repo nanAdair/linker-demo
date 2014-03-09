@@ -427,5 +427,5 @@ void UpdateSymbolValue(Symbol *sym_list, Section *sec_list, Section *merge_list)
         cur_sym = cur_sym->sym_next;
     }
     
-    showSymbolInfo(sym_list);
+    /*showSymbolInfo(sym_list);*/
 }

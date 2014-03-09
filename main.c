@@ -108,6 +108,16 @@ int main(int argc, char *argv[])
     
     ApplyRelocations(rel_list, sec_list, merge_list, sym_list, dyn_sym_list);
     
+    //.shstrtab update after construct the new sec_list
+    UpdateShstrSection(sec_list);
+
+    RenewRelGOTSection(sec_list);
+    RenewRelPLTSection(sec_list);
+    RenewPLTSection(sec_list);
+    RenewGOTPLTSection(sec_list);
+    RenewSectionInfo(sec_list);
+    RenewDynamicSection(sec_list);
+    
     /*showSection(sec_list);*/
     Section *test;
     /*test = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
@@ -117,9 +127,11 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, GNR_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);*/
+    /*test = GetSectionByName(sec_list, REL_DYN_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
-    test = GetSectionByName(sec_list, TEXT_SECTION_NAME);
+    /*test = GetSectionByName(sec_list, TEXT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, INIT_SECTION_NAME);*/
+    test = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
     showSectionData(test);
     showSection(sec_list);
     /*showSection(merge_list);*/

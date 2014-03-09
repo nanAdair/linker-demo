@@ -47,6 +47,8 @@
 
 #define BSS_SECTION_NAME        ".bss"
 
+#define SHSTRTAB_SECTION_NAME   ".shstrtab"
+
 #define DYNAMIC_NUMBER 28
 #define DYNAMIC_ENTSIZE 8
 
@@ -83,6 +85,7 @@ void InsertSectionAfterSection(Section *, Section *);
 void CreateSections(Section *);
 void UpdateInterpSection(Section *, char *);
 void UpdateDynstrSection(Section *, struct Symbol *, char *);
+void UpdateShstrSection(Section *);
 void UpdateDynsymSection(Section *, struct Symbol *);
 void UpdateGVSection(Section *, struct Symbol *);
 //void UpdateHashSection(Section *, struct Symbol *);
@@ -91,6 +94,13 @@ void UpdateGNRSection(Section *, struct Symbol *, char *);
 void UpdatePLTRelatedSections(Section *, struct Symbol *);
 void UpdateGOTRelatedSections(Section *, struct Symbol *);
 void UpdateDynamicSection(Section *, int);
+
+void RenewRelGOTSection(Section *);
+void RenewRelPLTSection(Section *);
+void RenewPLTSection(Section *);
+void RenewGOTPLTSection(Section *);
+void RenewSectionInfo(Section *);
+void RenewDynamicSection(Section *);
 
 //void AddDynstrEntryFromName(Section *, struct Symbol *);
 //void AddDynsymEntry(Section *, struct Symbol *);

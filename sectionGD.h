@@ -65,4 +65,31 @@ Elf32_Shdr AddedSectionsInfo[] = {
     /*  .got.plt */
     {0, SHT_PROGBITS,       SHF_ALLOC | SHF_WRITE,      0, 0, 0, 0, 0, 4,    4}
 };
+
+Elf32_Dyn DynamicSectionInfo[] = {
+    {DT_PLTGOT,         0x0},
+    {DT_PLTRELSZ,       0x0},
+    {DT_JMPREL,         0x0},
+    {DT_PLTREL,         0x0},
+    {DT_REL,            0x0},
+    {DT_RELSZ,          0x0},
+    {DT_RELENT,         0x0},
+    {DT_DEBUG,          0x0},
+    {DT_SYMTAB,         0x0},
+    {DT_SYMENT,         0x0},
+    {DT_STRTAB,         0x0},
+    {DT_STRSZ,          0x0},
+    {DT_HASH,           0x0},
+    {DT_NEEDED,         0x0},
+    {DT_INIT,           0x0},
+    {DT_FINI,           0x0},
+    {DT_FINI_ARRAY,     0x0},
+    {DT_FINI_ARRAYSZ,   0x0},
+    {DT_INIT_ARRAY,     0x0},
+    {DT_INIT_ARRAYSZ,   0x0},
+    {DT_VERSYM,         0x0},
+    {DT_VERNEED,        0x0},
+    {DT_VERNEEDNUM,     0x0},
+    {DT_NULL,           0x0}
+};
 #endif
