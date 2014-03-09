@@ -413,9 +413,10 @@ void UpdateSymbolValue(Symbol *sym_list, Section *sec_list, Section *merge_list)
                 cur_sym->sym_content->st_shndx = init_array->sec_number;
             }
             
+            /* Attention: _GLOBAL_OFFSET_TALBE IS THE ADDRESS OF .got.plt */
             if (!strcmp(cur_sym->sym_name, GOT_SYMBOL_NAME)) {
                 Section *got;
-                got = GetSectionByName(sec_list, GOT_SECTION_NAME);
+                got = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
                 sym_value = got->sec_address;
                 cur_sym->sym_content->st_shndx = got->sec_number;
             }

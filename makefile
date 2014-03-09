@@ -1,5 +1,5 @@
-main: main.o convert.o section.o utils.o version.o symbol.o
-	gcc -o main main.o convert.o section.o utils.o version.o symbol.o
+main: main.o convert.o section.o utils.o version.o symbol.o relocation.o
+	gcc -o main main.o convert.o section.o utils.o version.o symbol.o relocation.o
 main.o: main.c
 	gcc -c main.c
 convert.o: convert.c 
@@ -12,5 +12,7 @@ version.o: version.c
 	gcc -c version.c
 symbol.o: symbol.c
 	gcc -c symbol.c
+relocation.o: relocation.c
+	gcc -c relocation.c
 clean:
 	rm -rf main *.o *~

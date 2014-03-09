@@ -106,8 +106,10 @@ int main(int argc, char *argv[])
     
     UpdateSymbolValue(sym_list, sec_list, merge_list);
     
+    ApplyRelocations(rel_list, sec_list, merge_list, sym_list, dyn_sym_list);
+    
     /*showSection(sec_list);*/
-    /*Section *test;*/
+    Section *test;
     /*test = GetSectionByName(sec_list, INTERP_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);*/
@@ -116,7 +118,9 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, REL_PLT_SECTION_NAME);*/
-    /*showSectionData(test);*/
+    test = GetSectionByName(sec_list, TEXT_SECTION_NAME);
+    /*test = GetSectionByName(sec_list, INIT_SECTION_NAME);*/
+    showSectionData(test);
     showSection(sec_list);
     /*showSection(merge_list);*/
 }

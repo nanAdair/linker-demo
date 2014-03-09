@@ -3,6 +3,15 @@
 #include <stdlib.h>
 #include "relocation.h"
 
+static void ApplyRelocation_32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list);
+static void ApplyRelocation_PC32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list, Section *sec_list);
+static void ApplyRelocation_GOTPC(UINT32 rel_offset, Symbol *symbol, Section *section);
+static void ApplyRelocation_GOTOFF(UINT32 rel_offset, Symbol *symbol, Section *section, Section *);
+static void ApplyRelocation_GOT32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list);
+static void ApplyRelocation_PLT32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list, Section *sec_list);
+static int Relocation_32_GOT(Symbol *symbol, Symbol *dynsym_list);
+static int Relocation_PC32_PLT(Symbol *symbol, Symbol *dynsym_list);
+
 Relocation* getRel(Elf32_File *elf_file){
     Relocation *first, *cur;
     first = cur = NULL;
@@ -161,22 +170,22 @@ void ApplyRelocations(Relocation *rel_list, Section *sec_list, Section *merge_li
             case R_386_NONE:
                 break;
             case R_386_32:
-                /*ApplyRelocation_32(rel_offset, symbol, section);*/
+                ApplyRelocation_32(rel_offset, symbol, section, dynsym_list);
                 break;
             case R_386_PC32:
-                /*ApplyRelocation_PC32(rel_offset, symbol, section);*/
+                ApplyRelocation_PC32(rel_offset, symbol, section, dynsym_list, sec_list);
                 break;
             case R_386_GOTPC:
-                /*ApplyRelocation_GOTPC(rel_offset, symbol, section);*/
+                ApplyRelocation_GOTPC(rel_offset, symbol, section);
                 break;
             case R_386_GOTOFF:
-                /*ApplyRelocation_GOTOFF(rel_offset, symbol, section);*/
+                ApplyRelocation_GOTOFF(rel_offset, symbol, section, sec_list);
                 break;
             case R_386_GOT32:
-                /*ApplyRelocation_GOT32(rel_offset, symbol, section);*/
+                ApplyRelocation_GOT32(rel_offset, symbol, section, dynsym_list);
                 break;
             case R_386_PLT32:
-                /*ApplyRelocation_PLT32(rel_offset, symbol, section);*/
+                ApplyRelocation_PLT32(rel_offset, symbol, section, dynsym_list, sec_list);
                 break;
             default:
                 printf("error can't handle the relocation type\n");
@@ -188,7 +197,153 @@ void ApplyRelocations(Relocation *rel_list, Section *sec_list, Section *merge_li
     }
 }
 
-/*void ApplyRelocation_32(Relocation *rel, Symbol *symbol, Section *section)*/
-/*{*/
+static void ApplyRelocation_32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list)
+{
+    int addend, value;
+    int *buffer;
+    buffer = (int *)malloc(sizeof(int));
+    memcpy(buffer, section->sec_data + rel_offset, sizeof(int));
+    addend = *buffer;
+    free(buffer);
+    value = 0;
+    
+    if (symbol->sym_sd_type & SYM_GOT) {
+        /* TODO: UNFIEXD Maybe a bug, the method is for GOT32 */
+        /*value = Relocation_32_GOT(symbol, dynsym_list);*/
+    }
+    else {
+        value = symbol->sym_content->st_value + addend;
+    }
+    memcpy(section->sec_data + rel_offset, &value, sizeof(int));
+}
 
-/*}*/
+/* sum: GOT number
+ * index: symbol index in got start from 1
+ * return value: -4 * (sum - index + 1)*/
+static int Relocation_32_GOT(Symbol *symbol, Symbol *dynsym_list)
+{
+    Symbol *cur_sym;
+    cur_sym = dynsym_list;
+    int index, sum;
+    sum = 0;
+    
+    while (cur_sym) {
+        if (cur_sym->sym_sd_type & SYM_GOT)
+            sum++;
+        if (!strcmp(symbol->sym_name, cur_sym->sym_name)) {
+            index = sum;
+        }
+
+        cur_sym = cur_sym->sym_next;
+    }
+    
+    return (-4) * (sum - index + 1);
+}
+
+static void ApplyRelocation_PC32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list, Section *sec_list)
+{
+    int addend, value, rel_address, plt_address;
+    
+    // Get the addend value
+    int *buffer;
+    buffer = (int *)malloc(sizeof(int));
+    memcpy(buffer, section->sec_data + rel_offset, sizeof(int));
+    addend = *buffer;
+    free(buffer);
+    
+    // P
+    rel_address = section->sec_address + rel_offset;
+    value = 0;
+    
+    /* Don't handle the outside symbol's address, so caculate the address here */
+    if (symbol->sym_sd_type & SYM_PLT) {
+        Section *plt;
+        plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
+        plt_address = plt->sec_address;
+    
+        int sym_address;
+        sym_address = Relocation_PC32_PLT(symbol, dynsym_list) + plt_address;
+        /*printf("%x %s\n", sym_address, symbol->sym_name);*/
+        value = sym_address + addend - rel_address;
+    }
+    else{
+        value = (int)symbol->sym_content->st_value + addend - rel_address;
+        /*printf("%x %x %s\n", symbol->sym_content->st_value, value, symbol->sym_name);*/
+    }
+    
+    memcpy(section->sec_data + rel_offset, &value, sizeof(int));
+}
+
+/* return the offset of the symbol in plt */
+static int Relocation_PC32_PLT(Symbol *symbol, Symbol *dynsym_list)
+{
+    int i, index;
+    i = 0;
+    
+    Symbol *cur_sym;
+    cur_sym = dynsym_list;
+    
+    while (cur_sym) {
+        if (cur_sym->sym_sd_type & SYM_PLT)
+            i++;
+        if (!strcmp(symbol->sym_name, cur_sym->sym_name)) {
+            index = i;
+            break;
+        }
+        
+        cur_sym = cur_sym->sym_next;
+    }
+
+    return 16 * index;
+}
+
+/* .got.plt address - the relocation's instr's address (not a pc-changing instr)
+ * eg: after get_pc_thunk instruction, there is a instr to find the .got.plt table
+ * address which is used for finding the symbol address in got later*/
+static void ApplyRelocation_GOTPC(UINT32 rel_offset, Symbol *symbol, Section *section)
+{
+    int addend, value, rel_address;
+    
+    int *buffer;
+    buffer = (int *)malloc(sizeof(int));
+    memcpy(buffer, section->sec_data + rel_offset, sizeof(int));
+    addend = *buffer;
+    free(buffer);
+    
+    rel_address = section->sec_address + rel_offset;
+    value = (int)symbol->sym_content->st_value + addend - rel_address;
+    
+    memcpy(section->sec_data + rel_offset, &value, sizeof(int));
+}
+
+/* Take the .got.plt table address as an base to find the symbol's address */
+static void ApplyRelocation_GOTOFF(UINT32 rel_offset, Symbol *symbol, Section *section, Section *sec_list)
+{
+    int value, gotplt_address;
+    
+    Section *gotplt;
+    gotplt = GetSectionByName(sec_list, GOT_PLT_SECTION_NAME);
+    gotplt_address = gotplt->sec_address;
+    
+    value = (int)symbol->sym_content->st_value - gotplt_address;
+    
+    memcpy(section->sec_data + rel_offset, &value, sizeof(int));
+}
+
+/* find the symbol's address compared to .got.plt table address
+ * the symbol is in got*/
+static void ApplyRelocation_GOT32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list)
+{
+    int value;
+    
+    value = Relocation_32_GOT(symbol, dynsym_list);
+    
+    memcpy(section->sec_data + rel_offset, &value, sizeof(int));
+}
+
+/* The same as PC32
+ * because PC32 have to deal with the symbol in PLT*/
+static void ApplyRelocation_PLT32(UINT32 rel_offset, Symbol *symbol, Section *section, Symbol *dynsym_list, Section *sec_list)
+{
+    ApplyRelocation_PC32(rel_offset, symbol, section, dynsym_list, sec_list);
+}

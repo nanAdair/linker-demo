@@ -21,6 +21,7 @@ Relocation *getRel(Elf32_File *);
 char *int2str(void *num, unsigned long size, int fixedSize, int extend);
 void UpdateGOTForRelocations(Relocation *, struct Symbol *);
 void UpdatePLTForRelocations(Relocation *, struct Symbol *);
+void ApplyRelocations(Relocation *, struct Section *, struct Section *, struct Symbol *, struct Symbol *);
 
 #endif /* _RELOCATION_H */
 
