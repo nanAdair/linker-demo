@@ -115,7 +115,7 @@ void InsertSectionAfterSection(Section *new_section, Section *section)
     }
 }
 
-Section *GetSectionByIndex(Section *sec_list, UINT32 sec_id)
+Section *GetSectionByIndex(Section *sec_list, UINT16 sec_id)
 {
     Section *cur_sec;
     cur_sec = sec_list;
@@ -249,14 +249,18 @@ static void FillDynstrSection(Section *dynstr_sec, Symbol *dynsym_list, char *so
     UINT8 *sec_data;
     int datasize;
     
-    sec_data = (UINT8 *)malloc(strlen(so_filename) + 1);
-    datasize = strlen(so_filename) + 1;
-    strcpy(sec_data, so_filename);
+    /*printf("%d\n", strlen(so_filename));*/
+    sec_data = (UINT8 *)malloc(strlen(so_filename) + 2);
+    memset(sec_data, 0x0, strlen(so_filename) + 2);
+    datasize = strlen(so_filename) + 2;
+    strcpy(sec_data + 1, so_filename);
     
     dynstr_sec->sec_data = sec_data;
     dynstr_sec->sec_datasize = datasize;
     
     first_sym = cur_sym = dynsym_list;
+    /* skip the first NULL symbol */
+    cur_sym = cur_sym->sym_next;
     while (cur_sym) {
         AddDynstrEntryFromName(dynstr_sec, cur_sym);
         cur_sym = cur_sym->sym_next;
@@ -287,6 +291,7 @@ static void AddDynstrEntryFromName(Section *dynstr_sec, Symbol *sym)
     
     UINT8 *buffer;
     buffer = (UINT8 *)malloc(newdatasize);
+    printf("%d\n", datasize);
     memcpy(buffer, dynstr_sec->sec_data, datasize);
     strcpy(buffer + datasize, sym->sym_name);
     
@@ -954,7 +959,10 @@ void RenewRelPLTSection(Section *sec_list)
     UINT32 gotplt_sec_address;
     gotplt_sec_address = gotplt->sec_address;
     // There are three item before
-    gotplt_sec_address += 0xc;
+    // TODO: UNFIEXED
+    // have added 0xc when constructing the .rel.plt section, r_offset is the offset
+    // compared to the section base address
+    /*gotplt_sec_address += 0xc;*/
     
     int i, number;
     number = relplt->sec_datasize / relplt->sec_entsize;
@@ -1064,6 +1072,7 @@ void RenewDynamicSection(Section *sec_list)
     printf("%d\n", number);
     
     for (i = 0; i < number; i++) {
+        printf("%d\n", i);
         Elf32_Dyn *dyn_item;
         dyn_item = (Elf32_Dyn *)(dynamic->sec_data + i * sizeof(Elf32_Dyn));
         
@@ -1115,7 +1124,8 @@ void RenewDynamicSection(Section *sec_list)
                 break;
             case DT_NEEDED:
                 // TODO: UNFIEXED: hard-code here
-                dyn_item->d_un.d_val = FindOffset(dynstr, "/usr/lib/libc.so.6");
+                dyn_item->d_un.d_val = FindOffset(dynstr, "libc.so.6");
+                /*dyn_item->d_un.d_val = FindOffset(dynstr, "/usr/lib/libc.so.6");*/
                 break;
             case DT_INIT:
                 dyn_item->d_un.d_ptr = init->sec_address;
@@ -1162,7 +1172,8 @@ void RenewSectionInfo(Section *sec_list)
     int id = 0;
     
     while (cur_sec) {
-        cur_sec->sec_number = id;
+        /*cur_sec->sec_number = id;*/
+        cur_sec->sec_final_number = id;
         id++;
         cur_sec = cur_sec->sec_next;
     }
@@ -1170,7 +1181,7 @@ void RenewSectionInfo(Section *sec_list)
     cur_sec = sec_list;
     
     Section *dynamic, *plt, *dynsym, *dynstr, *relgot, *relplt, *hash, *got, *gotplt;
-    Section *gv, *gnr, *interp;
+    Section *gv, *gnr, *interp, *symtab, *strtab;
     dynamic = GetSectionByName(sec_list, DYNAMIC_SECTION_NAME);
     plt = GetSectionByName(sec_list, PLT_SECTION_NAME);
     dynsym = GetSectionByName(sec_list, DYNSYM_SECTION_NAME);
@@ -1183,11 +1194,65 @@ void RenewSectionInfo(Section *sec_list)
     gv = GetSectionByName(sec_list, GV_SECTION_NAME);
     gnr = GetSectionByName(sec_list, GNR_SECTION_NAME);
     interp = GetSectionByName(sec_list, INTERP_SECTION_NAME);
+    symtab = GetSectionByName(sec_list, SYMTAB_SECTION_NAME);
+    strtab = GetSectionByName(sec_list, STRTAB_SECTION_NAME);
     
-    gnr->sec_info = dynsym->sec_info = interp->sec_number;
-    relplt->sec_info = gotplt->sec_number;
-    relgot->sec_info = got->sec_number;
+    gnr->sec_info = dynsym->sec_info = interp->sec_final_number;
+    relplt->sec_info = plt->sec_final_number;
+    /*relgot->sec_info = got->sec_number;*/
     
-    hash->sec_link = gv->sec_link = relgot->sec_link = relplt->sec_link = dynsym->sec_number;
-    gnr->sec_link = dynsym->sec_link = dynstr->sec_number;
+    hash->sec_link = gv->sec_link = relgot->sec_link = relplt->sec_link = dynsym->sec_final_number;
+    dynamic->sec_link = gnr->sec_link = dynsym->sec_link = dynstr->sec_final_number;
+    symtab->sec_link = strtab->sec_final_number;
+}
+
+void RenewSymbolSection(Section *sec_list, Section *merge_list, Section *sec, struct Symbol *sym_list)
+{
+    Section *temp;
+    Elf32_Sym *cur_sym;
+    int i, number;
+    number = sec->sec_datasize / sec->sec_entsize;
+    Symbol *symbol = sym_list;
+    
+    for (i = 0; i < number; i++) {
+        cur_sym = (Elf32_Sym *)(sec->sec_data + sec->sec_entsize * i);
+        int id;
+        id = cur_sym->st_shndx;
+        if (id != SHN_ABS && id != SHN_COMMON && id != SHN_UNDEF) {
+            temp = GetSectionByIndex(sec_list, id);
+            if (temp) {
+                cur_sym->st_shndx = temp->sec_final_number;
+            }
+            else {
+                temp = GetSectionByIndex(merge_list, id);
+                cur_sym->st_shndx = temp->sec_mergeto->sec_final_number;
+            }
+        }
+        else if (id == SHN_COMMON) {
+            temp = GetSectionByName(sec_list, BSS_SECTION_NAME);
+            cur_sym->st_shndx = temp->sec_final_number;
+        }
+        
+        cur_sym->st_value = symbol->sym_content->st_value;
+        cur_sym->st_info = symbol->sym_content->st_info;
+        
+        symbol = symbol->sym_next;
+    }
+}
+
+void UpdateEhframeSection(Section *sec_list)
+{
+    Section *eh_frame;
+    eh_frame = GetSectionByName(sec_list, EH_FRAME_SECTION_NAME);
+    
+    UINT32 datasize;
+    datasize = 0x158;
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(datasize);
+    memset(buffer, 0x0, datasize);
+    memcpy(buffer, eh_frame->sec_data, datasize);
+    
+    free(eh_frame->sec_data);
+    eh_frame->sec_data = buffer;
+    eh_frame->sec_datasize = datasize;
 }

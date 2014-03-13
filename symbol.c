@@ -184,6 +184,8 @@ Symbol *GetSymbolByIndex(Symbol *sym_list, UINT32 id)
 }
 
 // 动态符号有三种：GOT，PLT，导出符号
+// sym_target is defined in object file
+// sym_source is defined in so file
 static void MarkDynSymbol(Symbol *sym_target, Symbol *sym_source)
 {
     Symbol *cur_target, *cur_source, *first_target;
@@ -361,7 +363,7 @@ void UpdateSymbolValue(Symbol *sym_list, Section *sec_list, Section *merge_list)
         
         Section *sec;
         
-        /* TYPE: SECTION Just find the address of the section */
+        /* TYPE: Many Just find the address of the section */
         if ((sym_type == STT_SECTION || sym_type == STT_OBJECT || sym_type == STT_FUNC) && (sym_sd_type == SYM_LOCAL || sym_sd_type == SYM_OUT)) {
             Section *temp;
             temp = GetSectionByIndex(sec_list, sym_shndx);

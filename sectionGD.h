@@ -24,9 +24,9 @@
 
 UINT8 *AddedSectionsName[] = {
     INTERP_SECTION_NAME,
-    HASH_SECTION_NAME,
     DYNSYM_SECTION_NAME,
     DYNSTR_SECTION_NAME,
+    HASH_SECTION_NAME,
     GV_SECTION_NAME,
     GNR_SECTION_NAME,
     REL_DYN_SECTION_NAME,
@@ -42,12 +42,12 @@ Elf32_Shdr AddedSectionsInfo[] = {
 
     /* .interp */
     {0, SHT_PROGBITS,       SHF_ALLOC,                  0, 0, 0, 0, 0, 1,    0},
-    /* .hash  */
-    {0, SHT_HASH,           SHF_ALLOC,                  0, 0, 0, 0, 0, 4,    4},
     /* .dynsym */
     {0, SHT_DYNSYM,         SHF_ALLOC,                  0, 0, 0, 0, 0, 4,    0x10},
     /* .dynstr */
     {0, SHT_STRTAB,         SHF_ALLOC,                  0, 0, 0, 0, 0, 1,    0},
+    /* .hash  */
+    {0, SHT_HASH,           SHF_ALLOC,                  0, 0, 0, 0, 0, 4,    4},
     /* .gnu.version */
     {0, SHT_GNU_versym,     SHF_ALLOC,                  0, 0, 0, 0, 0, 2,    2},
     /* .gnu.version_r */
@@ -57,7 +57,7 @@ Elf32_Shdr AddedSectionsInfo[] = {
     /* .rel.plt */
     {0, SHT_REL,            SHF_ALLOC,                  0, 0, 0, 0, 0, 4,    8},
     /* .plt */
-    {0, SHT_PROGBITS,       SHF_ALLOC | SHF_EXECINSTR,  0, 0, 0, 0, 0, 0x16, 4},
+    {0, SHT_PROGBITS,       SHF_ALLOC | SHF_EXECINSTR,  0, 0, 0, 0, 0, 0x10, 4},
     /*  .dynamic */
     {0, SHT_DYNAMIC,        SHF_ALLOC | SHF_WRITE,      0, 0, 0, 0, 0, 4,    8},
     /*  .got */

@@ -46,6 +46,13 @@
 #define FINI_ARRAY_SECTION_NAME ".fini_array"
 
 #define BSS_SECTION_NAME        ".bss"
+#define RODATA_SECION_NAME      ".rodata"
+#define EH_FRAME_SECTION_NAME   ".eh_frame"
+#define JCR_SECTION_NAME        ".jcr"
+#define DATA_SECTION_NAME       ".data"
+#define COMMENT_SECTION_NAME    ".comment"
+#define SYMTAB_SECTION_NAME     ".symtab"
+#define STRTAB_SECTION_NAME     ".strtab"
 
 #define SHSTRTAB_SECTION_NAME   ".shstrtab"
 #define NOTE_SECTION_NAME       ".note.ABI-tag"
@@ -55,6 +62,7 @@
 
 typedef struct Section {
     UINT16 sec_number;
+    UINT16 sec_final_number;
     struct Section *sec_prev;
     struct Section *sec_next;
     struct Section *sec_mergeto;
@@ -81,7 +89,7 @@ typedef struct Section {
 struct Symbol;
 // function declaration
 Section *GetSections(Elf32_File *);
-Section *GetSectionByIndex(Section *, UINT32);
+Section *GetSectionByIndex(Section *, UINT16);
 Section *GetSectionByName(Section *, UINT8 *);
 void InsertSectionAfterSection(Section *, Section *);
 void CreateSections(Section *);
@@ -96,6 +104,7 @@ void UpdateGNRSection(Section *, struct Symbol *, char *);
 void UpdatePLTRelatedSections(Section *, struct Symbol *);
 void UpdateGOTRelatedSections(Section *, struct Symbol *);
 void UpdateDynamicSection(Section *, int);
+void UpdateEhframeSection(Section *sec_list);
 
 void RenewRelGOTSection(Section *);
 void RenewRelPLTSection(Section *);
@@ -103,6 +112,7 @@ void RenewPLTSection(Section *);
 void RenewGOTPLTSection(Section *);
 void RenewSectionInfo(Section *);
 void RenewDynamicSection(Section *);
+void RenewSymbolSection(Section *sec_list, Section *merge_list, Section *sec, struct Symbol *);
 
 //void AddDynstrEntryFromName(Section *, struct Symbol *);
 //void AddDynsymEntry(Section *, struct Symbol *);

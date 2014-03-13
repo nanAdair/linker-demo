@@ -166,6 +166,7 @@ Section *SortSectionsByWriteOrder(Section *sec_list)
     for (i = 0; i < number_sections; i++) {
         if (i > 0)
             InsertSectionAfterSection(list[i], list[i-1]);
+        /*list[i]->sec_final_number = i;*/
     }
     
     return res_list;
@@ -203,7 +204,8 @@ void AllocateAddress(Section *sec_list)
             cur_sec->sec_address = 0;
         cur_sec->sec_file_offset = offset;
         
-        offset += cur_sec->sec_datasize;
+        if (strcmp(cur_sec->sec_name, BSS_SECTION_NAME))
+            offset += cur_sec->sec_datasize;
         
         last_sec = cur_sec;
         cur_sec = cur_sec->sec_next;
@@ -223,6 +225,10 @@ static void RoundUpSection(Section *sec, int add)
     
     free(sec->sec_data);
     sec->sec_data = buffer;
+    /* TODO: TOBE FIXED, the datasize won't be changed
+     * instead, write out exact number of 0x0 when write a file
+     * The error occured when use datasize as an parameter*/
+    /*sec->sec_datasize = newdatasize;*/
 }
 
 Section_Table *CreateSectionTable(Section *sec_list)
@@ -246,6 +252,7 @@ Section_Table *CreateSectionTable(Section *sec_list)
         
         cur_shdr->sh_name = cur_sec->sec_name_offset;
         cur_shdr->sh_type = cur_sec->sec_type;
+        cur_shdr->sh_addr = cur_sec->sec_address;
         cur_shdr->sh_flags = cur_sec->sec_flags;
         cur_shdr->sh_offset = cur_sec->sec_file_offset;
         cur_shdr->sh_size = cur_sec->sec_datasize;
@@ -275,7 +282,7 @@ Section_Table *CreateSectionTable(Section *sec_list)
         }
         
         if (!strcmp(cur_sec->sec_name, SHSTRTAB_SECTION_NAME))
-            sec_tab->str_index = cur_sec->sec_number;
+            sec_tab->str_index = cur_sec->sec_final_number;
 
         i++;
         last_sec = cur_sec;
@@ -493,8 +500,25 @@ void WriteOut(Elf32_Ehdr *ehdr_data, UINT8 *phdr_data, Section *sec_list, Sectio
     
     Section *cur_sec;
     cur_sec = sec_list;
+    UINT32 i, offset;
+    UINT8 zero = 0x0;
+    
+    offset = cur_sec->sec_file_offset;
+    i = 0;
     while (cur_sec) {
+        if (cur_sec->sec_file_offset != offset) {
+            for (i = 0; i < cur_sec->sec_file_offset - offset; i++)
+                fwrite(&zero, 1, 1, output);
+            offset = cur_sec->sec_file_offset;
+        }
+        
+        if (cur_sec->sec_type == SHT_NOBITS) {
+            cur_sec = cur_sec->sec_next;
+            continue;
+        }
         fwrite(cur_sec->sec_data, cur_sec->sec_datasize, 1, output);
+        offset += cur_sec->sec_datasize;
+        
         cur_sec = cur_sec->sec_next;
     }
     
