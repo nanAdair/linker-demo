@@ -98,7 +98,7 @@ void UpdateDynstrSection(Section *, struct Symbol *, char *);
 void UpdateShstrSection(Section *);
 void UpdateDynsymSection(Section *, struct Symbol *);
 void UpdateGVSection(Section *, struct Symbol *);
-//void UpdateHashSection(Section *, struct Symbol *);
+void UpdateHashSectionNew(Section *, struct Symbol *);
 void UpdateHashSection(Section *, struct Symbol *, Section *);
 void UpdateGNRSection(Section *, struct Symbol *, char *);
 void UpdatePLTRelatedSections(Section *, struct Symbol *);

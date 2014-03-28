@@ -44,12 +44,14 @@ int main(int argc, char *argv[])
     so_file = GetBinaryFileData(so_filename);
     
 
-    strcpy(temp_filename, argv[4]);
-    temp_file = GetBinaryFileData(temp_filename);
-    Section *temp_list;
-    temp_list = GetSections(temp_file);
-    Section *hash;
-    hash = GetSectionByName(temp_list, ".hash");
+    /* Fake hash section here */
+    /*strcpy(temp_filename, argv[4]);*/
+    /*temp_file = GetBinaryFileData(temp_filename);*/
+    /*Section *temp_list;*/
+    /*temp_list = GetSections(temp_file);*/
+    /*Section *hash;*/
+    /*hash = GetSectionByName(temp_list, ".hash");*/
+    
     /*Section *test;*/
     /*test = GetSectionByName(temp_list, ".hash");*/
     /*showSectionData(test);*/
@@ -76,9 +78,9 @@ int main(int argc, char *argv[])
     
     dyn_sym_list = MakeDynSymbol(sym_list, so_sym_list, rel_list);
     
-    char *filename;
-    filename = PrepareStr(so_filename);
-    printf("%s\n", filename);
+    /*char *filename;*/
+    /*filename = PrepareStr(so_filename);*/
+    /*printf("%s\n", filename);*/
 
     FILE *output;
     output = fopen("sec_test", "wb");
@@ -89,18 +91,19 @@ int main(int argc, char *argv[])
     //.interp
     UpdateInterpSection(sec_list, ld_filename);
     //.dynstr
-    UpdateDynstrSection(sec_list, dyn_sym_list, filename);
+    UpdateDynstrSection(sec_list, dyn_sym_list, so_filename);
     /*UpdateDynstrSection(sec_list, dyn_sym_list, so_filename);*/
     //.dynsym
     UpdateDynsymSection(sec_list, dyn_sym_list);
     //.gnu.version
     UpdateGVSection(sec_list, dyn_sym_list);
     //.hash
-    /*UpdateHashSection(sec_list, dyn_sym_list);*/
+    UpdateHashSectionNew(sec_list, dyn_sym_list);
     /* TODO: Faked content of hash section */
-    UpdateHashSection(sec_list, dyn_sym_list, hash);
+    /* do  */
+    /*UpdateHashSection(sec_list, dyn_sym_list, hash);*/
     //.gnu.version_r
-    UpdateGNRSection(sec_list, dyn_sym_list, filename);
+    UpdateGNRSection(sec_list, dyn_sym_list, so_filename);
     /*UpdateGNRSection(sec_list, dyn_sym_list, so_filename);*/
     //.plt, .got.plt, rel.plt
     UpdatePLTRelatedSections(sec_list, dyn_sym_list);
@@ -122,31 +125,23 @@ int main(int argc, char *argv[])
     showSection(sec_list);
     
     UpdateSymbolValue(sym_list, sec_list, merge_list);
-    UpdateSymbolValue(dyn_sym_list, sec_list, merge_list);
+    /*UpdateSymbolValue(dyn_sym_list, sec_list, merge_list);*/
     
     ApplyRelocations(rel_list, sec_list, merge_list, sym_list, dyn_sym_list);
-    printf("test\n");
     
-    Section *test;
-    test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);
-    showSectionData(output, test);
-    fclose(output);
+    /*Section *test;*/
+    /*test = GetSectionByName(sec_list, DYNSTR_SECTION_NAME);*/
+    /*showSectionData(output, test);*/
+    /*fclose(output);*/
 
     showSection(sec_list);
     RenewRelGOTSection(sec_list);
-    printf("test\n");
     RenewRelPLTSection(sec_list);
-    printf("test\n");
     RenewPLTSection(sec_list);
-    printf("test\n");
     RenewGOTPLTSection(sec_list);
-    printf("test\n");
     RenewSectionInfo(sec_list);
-    printf("test\n");
     RenewDynamicSection(sec_list);
-    printf("test\n");
     showSection(sec_list);
-    printf("test\n");
     /*RenewSymbolInfo(sym_list, dyn_sym_list, sec_list, merge_list);*/
     /* Have to change the corresponding section data */
     
@@ -200,7 +195,7 @@ int main(int argc, char *argv[])
     /*test = GetSectionByName(sec_list, SYMTAB_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, SHSTRTAB_SECTION_NAME);*/
     /*test = GetSectionByName(sec_list, STRTAB_SECTION_NAME);*/
-    /*showSectionData(test);*/
+    /*showSectionData(output, test);*/
     /*showSection(sec_list);*/
     /*showSection(merge_list);*/
     

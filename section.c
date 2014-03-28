@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <math.h>
 #include "section.h"
 #include "sectionGD.h"
 
@@ -362,6 +363,65 @@ static void AddDynsymEntry(Section *dynsym, Symbol *sym)
 }
 
 /* TODO: Can't understand the algorithm here now' */
+
+void UpdateHashSectionNew(Section *sec_list, Symbol *sym_list)
+{
+    Section *hash;
+    hash = GetSectionByName(sec_list, HASH_SECTION_NAME);
+    int number = 0;
+    Symbol *cur_sym;
+    cur_sym = sym_list;
+    
+    printf("test\n");
+    while (cur_sym->sym_next != NULL) {
+        number++;
+        cur_sym = cur_sym->sym_next;
+    }
+    number++;
+    printf("number is %d\n", number);
+    int nbuckets, nchains;
+    nchains = number;
+    nbuckets = (int)log2(number) + 1;
+    int datasize = (1 + 1 + nbuckets + nchains) * 4;
+    
+    UINT8 *buffer;
+    buffer = (UINT8 *)malloc(datasize);
+    memset(buffer, 0x0, datasize);
+    
+    memcpy(buffer, &nbuckets, sizeof(int));
+    memcpy(buffer + 4, &nchains, sizeof(int));
+    /*int i;*/
+    /*for (i = 0; i < nbuckets; i++) {*/
+        /*int num = number - i;*/
+        /*memcpy(buffer + 8 + 4 * i, &num, sizeof(int));*/
+    /*}*/
+    
+    /*cur_sym = cur_sym->sym_prev;*/
+
+    while (cur_sym->sym_prev != NULL) {
+        int hashvalue = CalculateHash(cur_sym->sym_name);
+        int order, index;
+        order = hashvalue % nbuckets;
+        index = *(int *)((buffer + 8 + order * 4));
+        if (index == 0)
+            memcpy(buffer + 8 + order * 4, &cur_sym->sym_id, sizeof(int));
+        else {
+            order = index;
+            index = *(int *)((buffer + 8 + nbuckets * 4 + order * 4));
+            while (index) {
+                order = index;
+                index = *(int *)((buffer + 8 + nbuckets * 4 + order * 4));
+            }
+            memcpy(buffer + 8 + nbuckets * 4 + order * 4, &cur_sym->sym_id, 4);
+        }
+
+        cur_sym = cur_sym->sym_prev;
+    }
+    
+    hash->sec_data = buffer;
+    hash->sec_datasize = datasize;
+}
+
 void UpdateHashSection(Section *sec_list, Symbol *sym_list, Section *hash)
 {
     Section *hash_sec;

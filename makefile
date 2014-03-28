@@ -1,5 +1,5 @@
 main: main.o convert.o section.o utils.o version.o symbol.o relocation.o
-	gcc -o main main.o convert.o section.o utils.o version.o symbol.o relocation.o
+	gcc -o main main.o convert.o section.o utils.o version.o symbol.o relocation.o -Wl,--hash-style=both -lm
 main.o: main.c
 	gcc -c main.c
 convert.o: convert.c 
